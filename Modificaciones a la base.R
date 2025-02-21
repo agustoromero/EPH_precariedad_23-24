@@ -49,9 +49,9 @@ base <- base %>%
                                    TRUE ~ "No"))
 #Calificacion_ocupaciones
 
-base_cno <- organize_cno(base)
+base <- organize_cno(base)
 
-base_cno <- base_cno %>%  
+base <- base %>%  
   filter(ESTADO == 1, CAT_OCUP == 3) %>% # Ocupados asalariados
    mutate(
      preca_tecno_calif = case_when(
@@ -59,112 +59,3 @@ base_cno <- base_cno %>%
        CALIFICACION %in% c(3, 4) ~ 1,
        TRUE ~ 0
      ))
-
-# Analizar la precariedad tecno_calif por sexo
-
-
-
-tabla_preca_tecno_calif_sexo <- calculate_tabulates(
-  base = base_cno,
-  x = "CH04",
-  y = "preca_tecno_calif",
-  weights = "PONDERA"
-)
-
-print(tabla_preca_tecno_calif_sexo)
-
-# Analizar la precariedad por nivel educativo
-tabla_preca_tecno_calif_educ <- calculate_tabulates(
-  base = base_cno,
-  x = "NIVEL_ED",
-  y = "preca_tecno_calif",
-  weights = "PONDERA"
-)
-print(tabla_preca_tecno_calif_educ)
-
-
-
-
-
-
-
-
-
-##Precariedad de tiempo
-
-base_cno <- base %>%
-  mutate(
-    disponibilidad_mas_horas = case_when(
-      PP03G == 1 & PP03H %in% c(1, 2) ~ "Disponible",
-      TRUE ~ "No Disponible"
-    )
-  )
-#Aquí, PP03G == 1 & PP03H %in% c(1, 2) verifica si el encuestado quería trabajar 
-#más horas y si podía empezar a trabajarlas en un plazo de dos semanas o inmediatamente
-
-base_con_cno <- base_con_cno %>%
-  mutate(
-    antiguedad_en_empleo = case_when(
-      !is.na(PP07A) & PP07A %in% c(1:6) ~ PP07A,  # Asalariados
-      !is.na(PP05H) & PP05H %in% c(1:6) ~ PP05H,  # Independientes
-      TRUE ~ NA_real_  # Otros casos
-    )
-  )
-#Dado que PP07A y PP05H son variables categóricas
-
-
-tabla_precariedad_horas <- calculate_tabulates(
-  base = base_con_cno,
-  x = "disponibilidad_mas_horas",
-  y = "precariedad_cno",
-  weights = "PONDERA"
-)
-print(tabla_precariedad_horas)
-
-tabla_precariedad_antiguedad <- calculate_tabulates(
-  base = base_con_cno,
-  x = "antiguedad_en_empleo",
-  y = "precariedad_cno",
-  weights = "PONDERA"
-)
-
-print(tabla_precariedad_antiguedad)
-
-#sub y sobre ocupación 
-
-#PP3E_TOT: Total de horas trabajadas en la ocupación principal.
-#PP3F_TOT: Total de horas trabajadas en otras ocupaciones.
-
-base_con_cno <- base_con_cno %>%
-  mutate(
-    total_horas_trabajadas = PP3E_TOT + PP3F_TOT
-  )
-
-base_con_cno <- base_con_cno %>%
-  mutate(
-    categoria_ocupacional = case_when(
-      total_horas_trabajadas < 35 ~ "Subocupado",
-      total_horas_trabajadas > 45 ~ "Sobreocupado",
-      TRUE ~ "Ocupado Pleno"
-    )
-  )
-#PP03G (quería trabajar más horas) y PP03J (buscó otro empleo)
-base_con_cno <- base_con_cno %>%
-  mutate(
-    condicion_demanda = case_when(
-      PP03G == 1 | PP03J == 1 ~ "Demandante",
-      TRUE ~ "No Demandante"
-    )
-  )
-
-base_con_cno <- base_con_cno %>%
-  mutate(
-    clasificacion_final = paste(categoria_ocupacional, condicion_demanda, sep = " - ")
-  )
-
-tabla_clasificacion_final <- calculate_tabulates(
-  base = base_con_cno,
-  x = "clasificacion_final",
-  weights = "PONDERA"
-)
-print(tabla_clasificacion_final)
