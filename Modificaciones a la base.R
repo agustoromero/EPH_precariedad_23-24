@@ -8,7 +8,7 @@ library(eph)
 base <- get_microdata(year = 2023, trimester = 3, type = "individual", vars = "all")
 #Falta definir las vars
 #Creo las vars nuevas de la base
-
+base <- organize_labels(base, type = "individual")
 base <- base %>%
   filter(ESTADO == 1, CAT_OCUP == 3) %>% # Ocupados asalariados
   mutate(
@@ -54,41 +54,40 @@ base_cno <- organize_cno(base)
 base_cno <- base_cno %>%  
   filter(ESTADO == 1, CAT_OCUP == 3) %>% # Ocupados asalariados
    mutate(
-     precariedad_cno = case_when(
-       digito4 == 1 | 
-       digito5 %in% c(3, 4) ~ 1,
+     preca_tecno_calif = case_when(
+       TECNOLOGIA == 1 | 
+       CALIFICACION %in% c(3, 4) ~ 1,
        TRUE ~ 0
      ))
 
-# Analizar la precariedad por sexo
-tabla_precariedad_sexo <- calculate_tabulates(
-  base = base_con_cno,
+# Analizar la precariedad tecno_calif por sexo
+
+
+
+tabla_preca_tecno_calif_sexo <- calculate_tabulates(
+  base = base_cno,
   x = "CH04",
-  y = "precariedad_cno",
+  y = "preca_tecno_calif",
   weights = "PONDERA"
 )
-print(tabla_precariedad_sexo)
+
+print(tabla_preca_tecno_calif_sexo)
 
 # Analizar la precariedad por nivel educativo
-tabla_precariedad_educacion <- calculate_tabulates(
-  base = base_con_cno,
+tabla_preca_tecno_calif_educ <- calculate_tabulates(
+  base = base_cno,
   x = "NIVEL_ED",
-  y = "precariedad_cno",
+  y = "preca_tecno_calif",
   weights = "PONDERA"
 )
-print(tabla_precariedad_educacion)
+print(tabla_preca_tecno_calif_educ)
 
 
-##GGPLOT2
-# Visualizar la precariedad por sexo
-ggplot(tabla_precariedad_sexo$tabulates[[8]], aes(x = CH04, y = percentage, fill = precariedad_cno)) +
-  geom_bar(stat = "identity", position = "dodge") +
-  labs(title = "Precariedad Laboral por Sexo", x = "Sexo", y = "Porcentaje", fill = "Precariedad")
 
-# Visualizar la precariedad por nivel educativo
-ggplot(tabla_precariedad_educacion$tabulates[[8]], aes(x = NIVEL_ED, y = percentage, fill = precariedad_cno)) +
-  geom_bar(stat = "identity", position = "dodge") +
-  labs(title = "Precariedad Laboral por Nivel Educativo", x = "Nivel Educativo", y = "Porcentaje", fill = "Precariedad")
+
+
+
+
 
 
 ##Precariedad de tiempo
@@ -113,7 +112,7 @@ base_con_cno <- base_con_cno %>%
   )
 #Dado que PP07A y PP05H son variables categóricas
 
-#análisis tiempo
+
 tabla_precariedad_horas <- calculate_tabulates(
   base = base_con_cno,
   x = "disponibilidad_mas_horas",
