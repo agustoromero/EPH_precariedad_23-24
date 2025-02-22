@@ -5,11 +5,12 @@ library(eph)
 
 
 #Trabajo la base####
-base <- get_microdata(year = 2023, trimester = 3, type = "individual", vars = "all")
-#Falta definir las vars
 #Creo las vars nuevas de la base
+
+base <- get_microdata(year = 2023, trimester = 3, type = "individual", vars = "all")
 base <- organize_labels(base, type = "individual")
 
+#Defino variables de la persona####
 #Rango etario
 base <- base %>%
   mutate(
@@ -26,8 +27,8 @@ base <- base %>%
       TRUE ~ NA_character_  # Para valores faltantes
     )
   )
-
-base <- base %>% # Ocupados asalariados
+#Nivel educativo con desagregación de superior incompleta
+base <- base %>%
   mutate(
     nivel.ed = factor(
       case_when(NIVEL_ED %in% c(7,1,2,3) ~ "Menor a Secundaria",
@@ -39,6 +40,9 @@ base <- base %>% # Ocupados asalariados
 
 #Se propone una nueva forma de construir la variable establecimiento incluyendo:
 #las preguntas de rescate y a las asalariadas de casas particulares
+#Armo las variables de establecimiento####
+base <- base %>% organize_caes()  
+
 base <- base %>%  filter(ESTADO==1) %>%  mutate(tamanio.establec.nueva = case_when(PP04C== 1~ "uni",
                                                                                    PP04C== 2~ "peque",
                                                                                    PP04C== 3~ "peque",
@@ -56,21 +60,24 @@ base <- base %>%  filter(ESTADO==1) %>%  mutate(tamanio.establec.nueva = case_wh
                                                                                    PP04C99== 3 ~ "grande",
                                                                                    PP04C99==9 ~ "NS/NR",
                                                                                    PP04B1==1 ~ "casaparticular"))
-
+#Cambios en las variables del puesto####
+#descuento jubilatorio
 base <- base %>%
   filter(ESTADO == 1, CAT_OCUP == 3) %>% # Ocupados asalariados
   mutate(   descuento_jubil = case_when(PP07H == 1 ~ "Protegido",
                                 PP07H == 2 ~ "No-protegido"))
-    
+#aportes propios al interior de los asalariados precarios
 base <- base %>%
-      filter(ESTADO == 1, CAT_OCUP == 3) %>% # Ocupados asalariados
+      filter(ESTADO == 1, CAT_OCUP == 3, PP07H ==2) %>% # Ocupados asalariados
       mutate(aportes_propios = case_when(PP07I == 1 ~ "Monotributista",
                                          PP07I == 2 ~ "Negro"))
         
+#part time involuntario
 base <- base %>%
   filter(ESTADO == 1, CAT_OCUP == 3) %>% # Ocupados asalariados
   mutate( part.time.inv = case_when(PP3E_TOT < 35 & PP03G == 1 ~ "Si",
                               TRUE ~ "No"))
+#Tiempo determinado
 base <- base %>%
   filter(ESTADO == 1, CAT_OCUP == 3) %>% # Ocupados asalariados
   mutate(tiempo.determinado = case_when(PP07C ==  1 ~ "Si",
@@ -87,8 +94,6 @@ base <- base %>%
        CALIFICACION %in% c(3, 4) ~ 1,
        TRUE ~ 0
      ))
-
-base <- base %>% organize_caes()  
 
 
 #ANTIGUEDAD. Dado que PP07A y PP05H son variables categóricas...
