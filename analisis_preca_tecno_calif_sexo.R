@@ -89,29 +89,73 @@ tabla_precaTC_ant <- calculate_tabulates(
   mutate(sexo = "Total")
 print(tabla_precaTC_ant)
 
-  
-  tabla_precaTC_ant_varon <- base %>% 
-    filter(CH04 == "1") %>%  # solo varones
-    calculate_tabulates(
-      x = "antiguedad_empleo",
-      y = "preca_tecno_calif",
-      weights = "PONDERA")     %>% 
-      mutate(sexo = "Varón")
-  print(tabla_precaTC_ant_varon)
+# Crear tabla para ambos sexos
+tabla_precaTC_ant <- base %>%  
+  calculate_tabulates(
+    x = "antiguedad_empleo",
+    y = "preca_tecno_calif",
+    weights = "PONDERA"
+  ) %>% 
+  rename(total_segun_antiguedad = `0`) %>%  # Renombrar correctamente
+  mutate(
+    total_grupo = sum(total_segun_antiguedad, na.rm = TRUE),  # Total combinado
+    porcentaje_sobre_total = (total_segun_antiguedad / total_grupo) * 100,  # Porcentaje sobre total
+    sexo = "Ambos"  # Agregar variable de sexo
+  ) %>% 
+  select(-total_grupo)  # Eliminar la columna total_grupo
+print(tabla_precaTC_ant)
 
-  tabla_precaTC_ant_mujer <- base %>%  
-    filter(CH04 == "2") %>%  # Solo mujeres
-    calculate_tabulates(
-      x = "antiguedad_empleo",
-      y = "preca_tecno_calif",
-      weights = "PONDERA"
-    ) %>% 
-    rename(total_segun_antiguedad = `0`) %>%  # Renombrar correctamente
-    mutate(total_grupo = sum(total_segun_antiguedad, na.rm = TRUE)) %>% 
-    mutate(sexo = "mujer")  # Agregar variable de sexo al final
+# Calcular fila total combinada
+total_fila <- tabla_precaTC_ant %>%
+  summarise(
+    `antiguedad_empleo/preca_tecno_calif` = "Total",
+    total_segun_antiguedad = sum(total_segun_antiguedad, na.rm = TRUE),
+    porcentaje_sobre_total = sum(porcentaje_sobre_total, na.rm = TRUE),
+    sexo = "Total"
+  )
+
+# Combinar la fila de totales con la tabla original
+tabla_precaTC_ant_con_totales <- bind_rows(tabla_precaTC_ant, total_fila)
+
+# Ver la tabla final con totales
+print(tabla_precaTC_ant_con_totales)
+
+
+
   
-  print(tabla_precaTC_ant_mujer)
+# Crear tabla base para los varones
+tabla_precaTC_ant_varon <- base %>%  
+  filter(CH04 == "1") %>%  # Solo varones
+  calculate_tabulates(
+    x = "antiguedad_empleo",
+    y = "preca_tecno_calif",
+    weights = "PONDERA"
+  ) %>% 
+  rename(total_segun_antiguedad = `0`) %>%  # Renombrar correctamente
+  mutate(
+    total_grupo = sum(total_segun_antiguedad, na.rm = TRUE),
+    porcentaje_sobre_varones = (total_segun_antiguedad / total_grupo) * 100,
+    sexo = "Varón"  # Agregar variable de sexo
+  ) %>%
+  select(-total_grupo)  # Eliminar la columna total_grupo
+
+print(tabla_precaTC_ant_varon)
+
+# Calcular fila de totales para varones
+total_fila_varon <- tabla_precaTC_ant_varon %>%
+  summarise(
+    `antiguedad_empleo/preca_tecno_calif` = "Total",
+    total_segun_antiguedad = sum(total_segun_antiguedad, na.rm = TRUE),
+    porcentaje_sobre_varones = sum(porcentaje_sobre_varones, na.rm = TRUE),
+    sexo = "Total"
+  )
+# Combinar la fila 
+tabla_precaTC_ant_varon_con_totales <- bind_rows(tabla_precaTC_ant_varon, total_fila_varon)
+print(tabla_precaTC_ant_varon_con_totales)
   
+  
+  
+# Crear tabla base para los mujeres  
   tabla_precaTC_ant_mujer <- base %>%  
     filter(CH04 == "2") %>%  # Solo mujeres
     calculate_tabulates(
@@ -136,11 +180,14 @@ print(tabla_precaTC_ant)
       porcentaje_sobre_mujeres = sum(porcentaje_sobre_mujeres, na.rm = TRUE),
       sexo = "Total"
     )
-  
-  # Combinar la fila de totales con la tabla original
+  # Combinar la fila con la tabla original
   tabla_precaTC_ant_mujer_con_totales <- bind_rows(tabla_precaTC_ant_mujer, total_fila)
+  print(tabla_precaTC_ant_mujer_con_totales)
+ 
   
-  tabla_precaTC_ant_tot <- bind_rows(tabla_precaTC_ant, tabla_precaTC_ant_varon, tabla_precaTC_ant_mujer)
+  
+   tabla_precaTC_ant_FINAL <- bind_rows(tabla_precaTC_ant_con_totales, tabla_precaTC_ant_varon_con_totales, tabla_precaTC_ant_mujer_con_totales) %>%
+     mutate(across(everything(), ~ replace(., is.na(.), "-")))
   
   
   # Sumar total de cada grupo
