@@ -9,6 +9,24 @@ base <- get_microdata(year = 2023, trimester = 3, type = "individual", vars = "a
 #Falta definir las vars
 #Creo las vars nuevas de la base
 base <- organize_labels(base, type = "individual")
+
+#Rango etario
+base <- base %>%
+  mutate(
+    rango_etario = case_when(
+      CH06 < 19  ~ "Menor a 19",
+      CH06 >= 19 & CH06 <= 25 ~ "19 a 25",
+      CH06 >= 26 & CH06 <= 35 ~ "26 a 35",
+      CH06 >= 36 & CH06 <= 45 ~ "36 a 45",
+      CH06 >= 46 & CH06 <= 55 ~ "46 a 55",
+      CH06 >= 56 & CH06 <= 65 ~ "56 a 65",
+      CH06 >= 66 & CH06 <= 75 ~ "66 a 75",
+      CH06 >= 76 & CH06 <= 85 ~ "76 a 85",
+      CH06 > 85  ~ "Mayor a 85",
+      TRUE ~ NA_character_  # Para valores faltantes
+    )
+  )
+
 base <- base %>% # Ocupados asalariados
   mutate(
     nivel.ed = factor(
@@ -71,4 +89,21 @@ base <- base %>%
      ))
 
 base <- base %>% organize_caes()  
+
+
+#ANTIGUEDAD. Dado que PP07A y PP05H son variables categóricas...
+
+base <- base %>%
+  mutate(
+    antiguedad_empleo = case_when(
+      as_factor(PP07A) %in% c("1", "2", "3", "4", "5", "6") ~ as_factor(PP07A),#asalariados
+      as_factor(PP05H) %in% c("1", "2", "3", "4", "5", "6") ~ as_factor(PP05H) #no asalariados (independientes/cuentapropia)
+    ),
+    antiguedad_empleo = factor(
+      antiguedad_empleo, 
+      levels = c("1", "2", "3", "4", "5", "6"),
+      labels = c("menor a 1 mes", "1 a 3 meses", "más de 3 a 6 meses", 
+                 "más de 6 a 12 meses", "más de 1 año a 5 años", "más de 5 años")
+    )
+  )
   
