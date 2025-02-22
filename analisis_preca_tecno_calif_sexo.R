@@ -255,26 +255,14 @@ print(tabla_precaTC_ant_varon_con_totales)
    tabla_precaTC_ant_FINAL <- bind_rows(tabla_precaTC_ant_con_totales, tabla_precaTC_ant_varon_con_totales, tabla_precaTC_ant_mujer_con_totales) %>%
      mutate(across(everything(), ~ replace(., is.na(.), "-")))
   
-  
-  # Sumar total de cada grupo
-  tabla_precaTC_ant_tot <- tabla_precaTC_ant_tot %>%
-    group_by(CH04, antiguedad_empleo) %>%
-    mutate(total_grupo = sum(Freq, na.rm = TRUE)) %>% 
-    ungroup()
-  
-  # Calcular el peso relativo
-  total_general <- sum(tabla_precaTC_ant_tot$Freq, na.rm = TRUE)
-  
-  tabla_precaTC_ant_tot <- tabla_precaTC_ant_tot %>%
-    mutate(porcentaje = (Freq / total_general) * 100)
-
-  
-#sub y sobre ocupación 
-
-#PP3E_TOT: Total de horas trabajadas en la ocupación principal.
-#PP3F_TOT: Total de horas trabajadas en otras ocupaciones.
-#
-# base <- base %>%
-#   mutate(
-#     total_horas_trabajadas = PP3E_TOT + PP3F_TOT
-#   )
+#libero ambiente de trabajo
+   
+   objetos <- c("total_fila_edad", "total_fila_mujer_edad", "total_fila_varon", "total_fila_varon_edad",
+                "tabla_preca_TC_sexo", "tabla_precaTC_ant", "tabla_precaTC_ant_con_totales",
+                "tabla_precaTC_ant_mujer", "tabla_precaTC_ant_mujer_con_totales", "tabla_precaTC_ant_varon",
+                "tabla_precaTC_ant_varon_con_totales", "tabla_precaTC_edad", "tabla_precaTC_edad_con_totales",
+                "tabla_precaTC_edad_mujer", "table_precaTC_edad_mujer_con_totales")
+   
+   rm(list = intersect(objetos, ls()))
+   
+   #lascosascambian
