@@ -14,3 +14,25 @@ Cmuj_niveled_estab <- base  %>% filter(ESTADO==1 &  CAT_OCUP==3 & CH04==2)  %>%
                       x="nivel.ed",
                       y="tamanio.establec.nueva",
                       weights="PONDERA")
+
+Crama <- base  %>%
+  filter(ESTADO==1 &  CAT_OCUP==3 & CH04==2)  %>% 
+  group_by(caes_seccion_label)%>% summarise( total = sum (PONDERA))
+
+Csexo_rama <- base  %>%
+  filter(ESTADO==1 &  CAT_OCUP==3 & CH04==2)  %>% 
+  group_by(caes_seccion_label) %>% summarise( total = sum (PONDERA),
+                                             varon = sum (PONDERA[CH04==1]),
+                                             mujer = sum (PONDERA[CH04==2]),
+                                             'Prop. mujer' =  mujer / total,
+                                             'Prop. varon' = varon / total)
+
+Cregistro_rama <- base %>% group_by(caes_seccion_label) %>% summarise( total = sum (PONDERA),
+                                                                        Asal_protegidos = sum (PONDERA[CAT_OCUP==3& PP07H==1]),
+                                                                        Asal_precariosTot = sum (PONDERA[CAT_OCUP==3& PP07H==2]),
+                                                                        Asal_precarios_i1_mono = sum (PONDERA[CAT_OCUP==3& PP07I==1]),
+                                                                        Asal_precarios_i2_negr = sum (PONDERA[CAT_OCUP==3& PP07I==2]),
+                                                                       'part asal_prote' = Asal_protegidos / total,
+                                                                       'part Asal_precarios_i1_mono' = Asal_precarios_i1_mono / total, 
+                                                                       'part Asal_precarios_i2_negr' = Asal_precarios_i2_negr / total)
+)

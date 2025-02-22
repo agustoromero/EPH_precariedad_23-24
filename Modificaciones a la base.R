@@ -69,3 +69,6 @@ base <- base %>%
        CALIFICACION %in% c(3, 4) ~ 1,
        TRUE ~ 0
      ))
+
+base <- base %>% organize_caes()  
+  
