@@ -9,8 +9,7 @@ base <- get_microdata(year = 2023, trimester = 3, type = "individual", vars = "a
 #Falta definir las vars
 #Creo las vars nuevas de la base
 base <- organize_labels(base, type = "individual")
-base <- base %>%
-  filter(ESTADO == 1, CAT_OCUP == 3) %>% # Ocupados asalariados
+base <- base %>% # Ocupados asalariados
   mutate(
     nivel.ed = factor(
       case_when(NIVEL_ED %in% c(7,1,2,3) ~ "Menor a Secundaria",
@@ -19,15 +18,26 @@ base <- base %>%
                 NIVEL_ED == 6 ~ "Superior Completo",
                 TRUE ~ "Ns/Nr"),
       levels = c("Menor a Secundaria","Secundaria Completa","Superior Incompleto","Superior Completo")))
-base <- base %>%
-      filter(ESTADO == 1, CAT_OCUP == 3) %>% # Ocupados asalariados
-      mutate(
-        tamanio.establec = factor(
-      case_when(PP04C %in% 1:6  ~ "Pequeño",
-                PP04C %in% 7:8  ~ "Mediano",
-                PP04C %in% 9:12 ~ "Grande",
-                PP04C %in% 99   ~ "Ns/Nr"),
-      levels = c("Pequeño","Mediano","Grande","Ns/Nr")))
+
+#Se propone una nueva forma de construir la variable establecimiento incluyendo:
+#las preguntas de rescate y a las asalariadas de casas particulares
+base <- base %>%  filter(ESTADO==1) %>%  mutate(tamanio.establec.nueva = case_when(PP04C== 1~ "uni",
+                                                                                   PP04C== 2~ "peque",
+                                                                                   PP04C== 3~ "peque",
+                                                                                   PP04C== 4~ "peque",
+                                                                                   PP04C== 5~ "peque",
+                                                                                   PP04C== 6~ "mediano",
+                                                                                   PP04C== 7~ "mediano",
+                                                                                   PP04C== 8~ "mediano",
+                                                                                   PP04C== 9~ "grande",
+                                                                                   PP04C== 10~ "grande",
+                                                                                   PP04C== 11~ "grande",
+                                                                                   PP04C== 12~ "grande",
+                                                                                   PP04C99==1 ~ "peque",
+                                                                                   PP04C99==2 ~ "mediano",
+                                                                                   PP04C99== 3 ~ "grande",
+                                                                                   PP04C99==9 ~ "NS/NR",
+                                                                                   PP04B1==1 ~ "casaparticular"))
 
 base <- base %>%
   filter(ESTADO == 1, CAT_OCUP == 3) %>% # Ocupados asalariados
