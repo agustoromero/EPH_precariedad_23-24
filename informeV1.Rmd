@@ -1,0 +1,38 @@
+---
+title: "Análisis del Mercado de Trabajo: Precariedad e Informalidad"
+author: "Gaspar y Agustín"
+date: "`r Sys.Date()`"
+output: 
+  html_document:
+    toc: true
+    toc_depth: 3
+    number_sections: true
+    df_print: paged
+---
+
+# Parte 1: Caracterización del Mercado de Trabajo
+
+## Marco teórico
+
+Explicación sobre la precariedad y segmentación del mercado laboral en Argentina.
+
+## Caracterización del Mercado de Trabajo
+
+### Tasas Básicas y Específicas
+
+Análisis de tasas generales del mercado laboral 2023-2024.
+
+### Cuadros de Caracterización del Mercado de Trabajo
+
+#### Cuadro 2 del Informe de EPH
+
+-   Ocupados por intensidad y horarios (sub, sobre ocupado).
+-   Demandantes y no demandantes.
+
+# Parte 2: Informalidad y Precariedad
+
+## Composición de la Informalidad y Precariedad
+
+### Cuadro P2.1: Descuento Jubilatorio y Nivel Educativo
+
+\`\`\`{r cuadro_p21, echo=FALSE} \# Código en R para generar el cuadro de análisis por nivel educativo
