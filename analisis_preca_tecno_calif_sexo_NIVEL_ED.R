@@ -268,8 +268,10 @@ print(tabla_precaTC_ant_varon_con_totales)
   
 #libero ambiente de trabajo
    
-   objetos <- c("total_fila_edad", "total_fila_mujer_edad", "total_fila_varon", "total_fila_varon_edad",
-                "tabla_preca_TC_sexo", "tabla_precaTC_ant", "tabla_precaTC_ant_con_totales",
+   objetos <- c("total_fila_edad", "total_fila_mujer_edad", "total_fila_varon", "total_fila_varon_edad", "total_fila", 
+                "tabla_precaTC_edad_varon", "tabla_precaTC_edad_mujer", "tabla_precaTC_educ_varon", "tabla_precaTC_educ_mujer",
+                "tabla_preca_TC_sexo", "tabla_precaTC_ant", "tabla_precaTC_ant_con_totales", 
+                "tabla_precaTC_edad_varon_con_totales", "tabla_precaTC_edad_mujer_con_totales",
                 "tabla_precaTC_ant_mujer", "tabla_precaTC_ant_mujer_con_totales", "tabla_precaTC_ant_varon",
                 "tabla_precaTC_ant_varon_con_totales", "tabla_precaTC_edad", "tabla_precaTC_edad_con_totales",
                 "tabla_precaTC_edad_mujer", "table_precaTC_edad_mujer_con_totales")
