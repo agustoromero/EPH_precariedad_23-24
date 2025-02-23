@@ -38,10 +38,13 @@ base <- base %>%
                 TRUE ~ "Ns/Nr"),
       levels = c("Menor a Secundaria","Secundaria Completa","Superior Incompleto","Superior Completo")))
 
+
 #Se propone una nueva forma de construir la variable establecimiento incluyendo:
 #las preguntas de rescate y a las asalariadas de casas particulares
 #Armo las variables de establecimiento####
-base <- base %>% organize_caes()  
+
+
+base <- base %>% organize_caes()  #labels rama segun caes
 
 base <- base %>%  filter(ESTADO==1) %>%  mutate(tamanio.establec.nueva = case_when(PP04C== 1~ "uni",
                                                                                    PP04C== 2~ "peque",
@@ -59,42 +62,12 @@ base <- base %>%  filter(ESTADO==1) %>%  mutate(tamanio.establec.nueva = case_wh
                                                                                    PP04C99==2 ~ "mediano",
                                                                                    PP04C99== 3 ~ "grande",
                                                                                    PP04C99==9 ~ "NS/NR",
-                                                                                   PP04B1==1 ~ "casaparticular"))
+ 
+                                                                                   
+                                                                                                                                                                                                                                                   PP04B1==1 ~ "casaparticular"))
 #Cambios en las variables del puesto####
-#descuento jubilatorio
-base <- base %>%
-  filter(ESTADO == 1, CAT_OCUP == 3) %>% # Ocupados asalariados
-  mutate(   descuento_jubil = case_when(PP07H == 1 ~ "Protegido",
-                                PP07H == 2 ~ "No-protegido"))
-#aportes propios al interior de los asalariados precarios
-base <- base %>%
-      filter(ESTADO == 1, CAT_OCUP == 3, PP07H ==2) %>% # Ocupados asalariados
-      mutate(aportes_propios = case_when(PP07I == 1 ~ "Monotributista",
-                                         PP07I == 2 ~ "Negro"))
-        
-#part time involuntario
-base <- base %>%
-  filter(ESTADO == 1, CAT_OCUP == 3) %>% # Ocupados asalariados
-  mutate( part.time.inv = case_when(PP3E_TOT < 35 & PP03G == 1 ~ "Si",
-                              TRUE ~ "No"))
-#Tiempo determinado
-base <- base %>%
-  filter(ESTADO == 1, CAT_OCUP == 3) %>% # Ocupados asalariados
-  mutate(tiempo.determinado = case_when(PP07C ==  1 ~ "Si",
-                                   TRUE ~ "No"))
-#Calificacion_ocupaciones
 
-base <- organize_cno(base)
-
-base <- base %>%  
-  filter(ESTADO == 1, CAT_OCUP == 3) %>% # Ocupados asalariados
-   mutate(
-     preca_tecno_calif = case_when(
-       TECNOLOGIA == 1 | 
-       CALIFICACION %in% c(3, 4) ~ 1,
-       TRUE ~ 0
-     ))
-
+#Resultado de puesto y de estableccimiento
 
 #ANTIGUEDAD. Dado que PP07A y PP05H son variables categóricas...
 
@@ -111,4 +84,44 @@ base <- base %>%
                  "más de 6 a 12 meses", "más de 1 año a 5 años", "más de 5 años")
     )
   )
-  
+
+#Criterio precariedad de la clase.
+
+#Signos de precariedad:
+#descuento jubilatorio
+base <- base %>%
+  filter(ESTADO == 1, CAT_OCUP == 3) %>% # Ocupados asalariados
+  mutate(   descuento_jubil = case_when(PP07H == 1 ~ "Protegido",
+                                PP07H == 2 ~ "No-protegido"))
+#aportes propios al interior de los asalariados precarios
+base <- base %>%
+      filter(ESTADO == 1, CAT_OCUP == 3, PP07H ==2) %>% # Ocupados asalariados
+      mutate(aportes_propios = case_when(PP07I == 1 ~ "Monotributista",
+                                         PP07I == 2 ~ "No_Reg"))
+        
+#part time involuntario
+base <- base %>%
+  filter(ESTADO == 1, CAT_OCUP == 3) %>% # Ocupados asalariados
+  mutate( part.time.inv = case_when(PP3E_TOT < 35 & PP03G == 1 ~ "Si",
+                              TRUE ~ "No"))
+#Tiempo determinado
+base <- base %>%
+  filter(ESTADO == 1, CAT_OCUP == 3) %>% # Ocupados asalariados
+  mutate(tiempo.determinado = case_when(PP07C ==  1 ~ "Si",
+                                   TRUE ~ "No"))
+
+
+#Se suma al análisis de la precariedad de la clase 
+#Precariedad por Tecnologia_Calificacion_ocupaciones
+
+base <- organize_cno(base)
+
+base <- base %>%  
+  filter(ESTADO == 1, CAT_OCUP == 3) %>% # Ocupados asalariados
+   mutate(
+     preca_tecno_calif = case_when(
+       TECNOLOGIA == 1 |               #sin operacion  
+       CALIFICACION %in% c(3, 4) ~ 1,  #no calificado y operativo
+       TRUE ~ 0
+     ))
+
