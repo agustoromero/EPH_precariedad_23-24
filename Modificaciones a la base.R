@@ -2,7 +2,8 @@
 library(tidyverse)
 library(openxlsx)
 library(eph)
-
+library(dplyr)
+library(haven)
 
 #Trabajo la base####
 #Creo las vars nuevas de la base
@@ -45,26 +46,29 @@ base <- base %>%
 
 
 base <- base %>% organize_caes()  #labels rama segun caes
+base <- organize_cno(base)
+#con lo anterior corre cuadro 1
 
-base <- base %>%  filter(ESTADO==1) %>%  mutate(tamanio.establec.nueva = case_when(PP04C== 1~ "uni",
-                                                                                   PP04C== 2~ "peque",
-                                                                                   PP04C== 3~ "peque",
-                                                                                   PP04C== 4~ "peque",
-                                                                                   PP04C== 5~ "peque",
-                                                                                   PP04C== 6~ "mediano",
-                                                                                   PP04C== 7~ "mediano",
-                                                                                   PP04C== 8~ "mediano",
-                                                                                   PP04C== 9~ "grande",
-                                                                                   PP04C== 10~ "grande",
-                                                                                   PP04C== 11~ "grande",
-                                                                                   PP04C== 12~ "grande",
-                                                                                   PP04C99==1 ~ "peque",
-                                                                                   PP04C99==2 ~ "mediano",
-                                                                                   PP04C99== 3 ~ "grande",
-                                                                                   PP04C99==9 ~ "NS/NR",
- 
+
+base <- base %>%
+  filter(ESTADO == 1) %>%
+  mutate(tamanio.establec.nueva = case_when(
+    PP04C == 1 ~ "uni",
+    PP04C %in% c(2, 3, 4, 5) ~ "peque",
+    PP04C %in% c(6, 7, 8) ~ "mediano",
+    PP04C %in% c(9, 10, 11, 12) ~ "grande",
+    PP04C99 == 1 ~ "peque",
+    PP04C99 == 2 ~ "mediano",
+    PP04C99 == 3 ~ "grande",
+    PP04C99 == 9 ~ "NS/NR",
+    TRUE ~ NA_character_  # Captura valores no definidos
+  ))
+
+# Verificar si la variable fue creada correctamente
+print(table(base$tamanio.establec.nueva, useNA = "always"))
                                                                                    
-                                                                                                                                                                                                                                                   PP04B1==1 ~ "casaparticular"))
+ #PP04B1==1 ~ "casaparticular"))
+
 #Cambios en las variables del puesto####
 
 #Resultado de puesto y de estableccimiento
@@ -85,43 +89,69 @@ base <- base %>%
     )
   )
 
-#Criterio precariedad de la clase.
-
-#Signos de precariedad:
-#descuento jubilatorio
-base <- base %>%
-  filter(ESTADO == 1, CAT_OCUP == 3) %>% # Ocupados asalariados
-  mutate(   descuento_jubil = case_when(PP07H == 1 ~ "Protegido",
-                                PP07H == 2 ~ "No-protegido"))
-#aportes propios al interior de los asalariados precarios
-base <- base %>%
-      filter(ESTADO == 1, CAT_OCUP == 3, PP07H ==2) %>% # Ocupados asalariados
-      mutate(aportes_propios = case_when(PP07I == 1 ~ "Monotributista",
-                                         PP07I == 2 ~ "No_Reg"))
-        
-#part time involuntario
-base <- base %>%
-  filter(ESTADO == 1, CAT_OCUP == 3) %>% # Ocupados asalariados
-  mutate( part.time.inv = case_when(PP3E_TOT < 35 & PP03G == 1 ~ "Si",
-                              TRUE ~ "No"))
-#Tiempo determinado
-base <- base %>%
-  filter(ESTADO == 1, CAT_OCUP == 3) %>% # Ocupados asalariados
-  mutate(tiempo.determinado = case_when(PP07C ==  1 ~ "Si",
-                                   TRUE ~ "No"))
+#hata aca corre cuadro 2
 
 
-#Se suma al análisis de la precariedad de la clase 
-#Precariedad por Tecnologia_Calificacion_ocupaciones
 
-base <- organize_cno(base)
+#Criterio precariedad de la clase. creamos variables en base
 
 base <- base %>%  
-  filter(ESTADO == 1, CAT_OCUP == 3) %>% # Ocupados asalariados
-   mutate(
-     preca_tecno_calif = case_when(
-       TECNOLOGIA == 1 |               #sin operacion  
-       CALIFICACION %in% c(3, 4) ~ 1,  #no calificado y operativo
-       TRUE ~ 0
-     ))
+  filter(ESTADO == 1, CAT_OCUP == 3) %>%  # Ocupados asalariados
+  mutate(
+    # Signo de precariedad tecnológica y de calificación
+    preca_tecno_calif = case_when(
+      TECNOLOGIA == 1 & CALIFICACION == 1 ~ 4,  # Solo cuando ambos son 1
+      TRUE ~ 0 ),
+    
+    # Clasificación de educación
+    nivel.ed = factor(case_when(
+      NIVEL_ED %in% c(7,1,2,3) ~ "Menor a Secundaria",
+      NIVEL_ED %in% c(4,5) ~ "Secundaria Completa",
+      NIVEL_ED == 6 ~ "Superior Completo",
+      TRUE ~ "Ns/Nr"
+    ), levels = c("Menor a Secundaria","Secundaria Completa","Superior Completo")),
+    
+    # Clasificación de tamaño del establecimiento
+    tamanio.establec = factor(case_when(
+      PP04C %in% 1:6  ~ "Pequeño",
+      PP04C %in% 7:8  ~ "Mediano",
+      PP04C %in% 9:12 ~ "Grande",
+      PP04C %in% 99   ~ "Ns/Nr"
+    ), levels = c("Pequeño","Mediano","Grande","Ns/Nr")),
+    
+    # Descuento jubilatorio
+    descuento_jubil = case_when(PP07H == 1 ~ "Si", PP07H == 2 ~ "No"),
+    
+    # Part-time involuntario
+    part.time.inv = case_when(PP3E_TOT < 35 & PP03G == 1 ~ "Si", TRUE ~ "No"),
+    
+    # Tiempo determinado
+    tiempo.determinado = case_when(PP07C == 1 ~ "Si", TRUE ~ "No"),
+    
+    # Signos de precariedad
+    signo_educ_tamaño = as.integer(nivel.ed == "Menor a Secundaria" & tamanio.establec == "Pequeño"),  # 1er signo
+    signo_sindescuento = as.integer(descuento_jubil == "No"),  # 2do signo
+    signo_tiempo = as.integer(part.time.inv == "Si" & tiempo.determinado == "No"),  # 3er signo
+    signo_tecno_calif = as.integer(preca_tecno_calif == 4),  # 4to signo
+    
+    # Total de signos de precariedad
+    total_4_signos = signo_educ_tamaño + signo_sindescuento + signo_tiempo + signo_tecno_calif,
+    
+    # Al menos 1 de 4 signos
+    almenos1de4 = as.integer(total_4_signos >= 1),
+    
+    # Al menos 1 de 3 signos (sin contar tecnología y calificación)
+    almenos1de3 = as.integer(signo_educ_tamaño + signo_sindescuento + signo_tiempo >= 1),
+    
+    # Sin precariedad en los primeros 3 signos
+    sin_preca_de3 = as.integer(signo_educ_tamaño + signo_sindescuento + signo_tiempo == 0),
+    
+    # Sin precariedad en los 4 signos
+    sin_preca_de4 = as.integer(total_4_signos == 0)
+  )
+
+
+
+
+
 

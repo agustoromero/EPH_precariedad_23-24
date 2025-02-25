@@ -1,5 +1,3 @@
-library(dplyr)
-
 calcular_niveled_sexo_edad <- function(df) {
   cuadro_base <- df %>% 
     group_by(rango_etario, nivel.ed) %>% 

@@ -1,56 +1,51 @@
-library(dplyr)
 
-# Función para calcular tasas ocupacionales por grupo con totales por bloque de edad
-calcular_cuadro <- function(df, sexo_filtro = NULL, sexo_label) {
-  if (!is.null(sexo_filtro)) {
-    df <- df %>% filter(CH04 == sexo_filtro) # Filtrar por sexo si se especifica
+calcular_estab_condicion_registro <- function(df, tipo_estab = NULL, etiqueta_estab) {
+  if (!is.null(tipo_estab)) {
+    df <- df %>% filter(PP04A == tipo_estab)  # Filtrar por tipo de establecimiento si se especifica
   }
   
-  cuadro_base <- df %>% 
-    group_by(rango_etario) %>% 
+  cuadro_base <- df %>%
+    filter(ESTADO == 1, CAT_OCUP == 3) %>%
+    group_by(caes_seccion_label) %>%
     summarise(
-      Poblacion = sum(PONDERA, na.rm = TRUE),
-      Ocupados = sum(PONDERA[ESTADO == 1], na.rm = TRUE),
-      Desocupados = sum(PONDERA[ESTADO == 2], na.rm = TRUE),
-      PEA = Ocupados + Desocupados,
-      Ocupados_demand = sum(PONDERA[ESTADO == 1 & PP03J == 1], na.rm = TRUE),
-      Suboc_demandante = sum(PONDERA[ESTADO == 1 & INTENSI == 1 & PP03J == 1], na.rm = TRUE),
-      Suboc_no_demand = sum(PONDERA[ESTADO == 1 & INTENSI == 1 & PP03J %in% c(2,9)], na.rm = TRUE),
-      Subocupados = Suboc_demandante + Suboc_no_demand,
-      Ocupados_dis_nodem = sum(PONDERA[ESTADO == 1 & PP03J == 1 & PP03I == 2], na.rm = TRUE),
-      Sobreocupados = sum(PONDERA[ESTADO == 1 & INTENSI == 3], na.rm = TRUE)
-    ) %>% 
+      total = sum(PONDERA, na.rm = TRUE),
+      Asal_protegidos = sum(PONDERA[PP07H == 1], na.rm = TRUE),
+      Asal_precarios_tot = sum(PONDERA[PP07H == 2], na.rm = TRUE),
+      Asal_precarios_i1_mono = sum(PONDERA[PP07H == 2 & PP07I == 1], na.rm = TRUE),
+      Asal_precarios_i2_negr = sum(PONDERA[PP07H == 2 & PP07I == 2], na.rm = TRUE),
+      .groups = "drop"
+    ) %>%
     mutate(
-      `Tasa Actividad` = PEA / Poblacion,
-      `Tasa Empleo` = Ocupados / Poblacion,
-      `Tasa Desocupacion` = Desocupados / PEA,
-      `Tasa ocupados demandantes` = Ocupados_demand / PEA,
-      `Tasa Subocupacion` = Subocupados / PEA,
-      `Tasa Subocupacion demandante` = Suboc_demandante / PEA,
-      `Tasa Subocupacion no demandante` = Suboc_no_demand / PEA
+      part_asal_prote = Asal_protegidos / total,
+      part_asal_precarios = Asal_precarios_tot / total,
+      part_mono_en_precarios = Asal_precarios_i1_mono / Asal_precarios_tot,
+      part_negro_en_precarios = Asal_precarios_i2_negr / Asal_precarios_tot,
+      part_NSNR_en_precarios = (Asal_precarios_tot - Asal_precarios_i1_mono - Asal_precarios_i2_negr) / Asal_precarios_tot
     )
   
-  # Calcular fila de totales por grupo de edad
+  # Calcular fila de total por establecimiento
   total_fila <- cuadro_base %>%
     summarise(
-      rango_etario = "Total",
+      caes_seccion_label = "Total",
       across(where(is.numeric), sum, na.rm = TRUE)
     )
   
-  # Agregar columna de sexo
-  cuadro_final <- bind_rows(cuadro_base, total_fila) %>% mutate(sexo = sexo_label)
+  # Agregar columna de establecimiento
+  cuadro_estab_condicion_registro <- bind_rows(cuadro_base, total_fila) %>%
+    mutate(tipo_establecimiento = etiqueta_estab)
   
-  return(cuadro_final)
+  return(cuadro_estab_condicion_registro)
 }
 
-# Calcular cuadros con totales por edad
-cuadro_total <- calcular_cuadro(base, NULL, "Ambos")
-cuadro_varones <- calcular_cuadro(base, 1, "Varón")
-cuadro_mujeres <- calcular_cuadro(base, 2, "Mujer")
+# Calcular cuadros con totales por tipo de establecimiento
+cuadro_total <- calcular_estab_condicion_registro(base, NULL, "Total")
+cuadro_estatal <- calcular_estab_condicion_registro(base, 1, "Estatal")
+cuadro_privado <- calcular_estab_condicion_registro(base, 2, "Privado")
+cuadro_otro <- calcular_estab_condicion_registro(base, 3, "Otro")
 
 # Unir todos los cuadros
-cuadro_final <- bind_rows(cuadro_total, cuadro_varones, cuadro_mujeres) %>%
+cuadro_estab_condicion_registro_tipo_final <- bind_rows(cuadro_total, cuadro_estatal, cuadro_privado, cuadro_otro) %>%
   mutate(across(everything(), ~ replace(., is.na(.), "-")))
 
 # Mostrar el cuadro final
-print(cuadro_final)
+print(cuadro_estab_condicion_registro_tipo_final)

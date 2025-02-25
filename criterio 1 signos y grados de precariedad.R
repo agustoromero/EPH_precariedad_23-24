@@ -1,95 +1,56 @@
-
-# Agrupar por sexo y cantidad de signos de precariedad
-cuadro_precariedad <- base %>%
-  group_by(CH04, total_signos) %>%
-  summarise(
-    total = sum(PONDERA, na.rm = TRUE),
-    .groups = "drop"
-  ) %>%
-  mutate(
-    sexo = case_when(CH04 == 1 ~ "Varón",
-                     CH04 == 2 ~ "Mujer"),
-    total_signos = factor(total_signos, levels = 0:3, labels = c("0 signos", "1 signo", "2 signos", "3 signos"))
-  ) %>%
-  select(sexo, total_signos, total) %>%
-  arrange(sexo, total_signos)
-
-# Agregar la categoría "Ambos" sumando Varón + Mujer
-cuadro_ambos <- cuadro_precariedad %>%
-  group_by(total_signos) %>%
-  summarise(
-    total = sum(total, na.rm = TRUE),
-    .groups = "drop"
-  ) %>%
-  mutate(sexo = "Ambos")
-
-# Calcular el total general sumando todos los valores
-total_general <- cuadro_precariedad %>%
-  summarise(
-    sexo = "Total",
-    total_signos = "Total",
-    total = sum(total, na.rm = TRUE)
-  )
-
-# Unir todas las categorías y agregar la fila de total general
-cuadro_final <- bind_rows(cuadro_precariedad, cuadro_ambos, total_general) %>%
-  arrange(sexo, total_signos)
-
-# Mostrar tabla final
-print(cuadro_final)
-
-# Crear una función para calcular la tabla por cada tamaño de establecimiento
-calcular_tabla_por_tamanio <- function(base, tamanio) {
-  base_filtrada <- base %>%
-    filter(tamanio.establec == tamanio) %>%
-    group_by(CH04, total_signos) %>%
+# Función para el cuadro general de ambos (sin separar por sexo)
+cuadro_precariedad_ambos <- function(df) {
+  indicadores <- df %>%
     summarise(
-      total = sum(PONDERA, na.rm = TRUE),
-      .groups = "drop"
+      Total = n(),
+      "Signo 1: Educación-Tamaño" = sum(signo_educ_tamaño, na.rm = TRUE),
+      "Signo 2: Sin Descuento Jubilatorio" = sum(signo_sindescuento, na.rm = TRUE),
+      "Signo 3: Tiempo (PT involuntario + Indeterminado)" = sum(signo_tiempo, na.rm = TRUE),
+      "Signo 4: Tecnología-Calificación" = sum(signo_tecno_calif, na.rm = TRUE),
+      "Total con al menos 1 de 3" = sum(almenos1de3, na.rm = TRUE),
+      "Total sin signos de precariedad" = sum(sin_preca_de3, na.rm = TRUE)
     ) %>%
-    mutate(
-      sexo = case_when(CH04 == 1 ~ "Varón",
-                       CH04 == 2 ~ "Mujer"),
-      total_signos = factor(total_signos, levels = 0:3, labels = c("0 signos", "1 signo", "2 signos", "3 signos"))
-    ) %>%
-    select(sexo, total_signos, total) %>%
-    arrange(sexo, total_signos)
+    pivot_longer(cols = -Total, names_to = "Indicador", values_to = "Frecuencia_ambos") %>%
+    mutate(Proporcion_ambos = round(Frecuencia_ambos / Total * 100, 2)) 
   
-  # Agregar la categoría "Ambos" sumando Varón + Mujer
-  cuadro_ambos <- base_filtrada %>%
-    group_by(total_signos) %>%
-    summarise(
-      total = sum(total, na.rm = TRUE),
-      .groups = "drop"
-    ) %>%
-    mutate(sexo = "Ambos")
+  # Reorganizar y pivotar
+  indicadores <- indicadores %>%
+    pivot_longer(cols = c(Frecuencia_ambos, Proporcion_ambos), names_to = "Tipo", values_to = "Valor") %>%
+    pivot_wider(names_from = Tipo, values_from = Valor) %>%
+    select(Indicador, Frecuencia_ambos, Proporcion_ambos)
   
-  # Calcular el total general sumando todos los valores
-  total_general <- base_filtrada %>%
-    summarise(
-      sexo = "Total",
-      total_signos = "Total",
-      total = sum(total, na.rm = TRUE)
-    )
-  
-  # Unir todas las categorías y agregar la fila de total general
-  cuadro_final <- bind_rows(base_filtrada, cuadro_ambos, total_general) %>%
-    arrange(sexo, total_signos)
-  
-  # Agregar el nombre del tamaño de establecimiento como una columna
-  cuadro_final <- cuadro_final %>%
-    mutate(tamanio.establec = tamanio)
-  
-  return(cuadro_final)
+  return(indicadores)
 }
 
-# Calcular las tablas para cada tamaño de establecimiento
-cuadro_pequeno <- calcular_tabla_por_tamanio(base, "Pequeño")
-cuadro_mediano <- calcular_tabla_por_tamanio(base, "Mediano")
-cuadro_grande <- calcular_tabla_por_tamanio(base, "Grande")
+# Función para el cuadro por sexo
+cuadro_precariedad_sexo <- function(df) {
+  indicadores <- df %>%
+    group_by(CH04) %>%  # Suponiendo que CH04 es la columna de sexo
+    summarise(
+      Total = n(),
+      "Signo 1: Educación-Tamaño" = sum(signo_educ_tamaño, na.rm = TRUE),
+      "Signo 2: Sin Descuento Jubilatorio" = sum(signo_sindescuento, na.rm = TRUE),
+      "Signo 3: Tiempo (PT involuntario + Indeterminado)" = sum(signo_tiempo, na.rm = TRUE),
+      "Signo 4: Tecnología-Calificación" = sum(signo_tecno_calif, na.rm = TRUE),
+      "Total con al menos 1 de 3" = sum(almenos1de3, na.rm = TRUE),
+      "Total sin signos de precariedad" = sum(sin_preca_de3, na.rm = TRUE)
+    ) %>%
+    pivot_longer(cols = -c(Total, CH04), names_to = "Indicador", values_to = "Frecuencia") %>%
+    mutate(Proporcion = round(Frecuencia / Total * 100, 2)) %>%
+    pivot_wider(names_from = CH04, values_from = c(Frecuencia, Proporcion)) 
+  
+  indicadores <- indicadores %>%
+    select(Indicador, starts_with("Frecuencia"), starts_with("Proporcion"))
+  
+  return(indicadores)
+}
 
-# Unir todas las tablas por tamaño de establecimiento
-cuadro_final_completo <- bind_rows(cuadro_pequeno, cuadro_mediano, cuadro_grande)
+# Llamar ambas funciones
+cuadro_general <- cuadro_precariedad_ambos(base)
+cuadro_sexo <- cuadro_precariedad_sexo(base)
 
-# Mostrar la tabla final
-print(cuadro_final_completo)
+# Combinar los resultados con bind_rows
+cuadro_completo <- bind_rows(cuadro_general, cuadro_sexo)
+
+# Ver el resultado
+cuadro_completo
