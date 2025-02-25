@@ -47,7 +47,7 @@ base <- base %>%
 
 base <- base %>% organize_caes()  #labels rama segun caes
 base <- organize_cno(base)
-#con lo anterior corre cuadro 1
+#con lo anterior corre cuadro 1 
 
 
 base <- base %>%
@@ -90,6 +90,10 @@ base <- base %>%
   )
 
 #hata aca corre cuadro 2
+
+
+
+
 
 
 

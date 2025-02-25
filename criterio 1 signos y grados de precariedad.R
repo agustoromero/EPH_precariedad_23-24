@@ -51,6 +51,6 @@ cuadro_sexo <- cuadro_precariedad_sexo(base)
 
 # Combinar los resultados con bind_rows
 cuadro_completo <- bind_rows(cuadro_general, cuadro_sexo)
-
+rm(cuadro_general, cuadro_sexo)
 # Ver el resultado
 cuadro_completo

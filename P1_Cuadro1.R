@@ -46,6 +46,7 @@ cuadro_otro <- calcular_estab_condicion_registro(base, 3, "Otro")
 # Unir todos los cuadros
 cuadro_estab_condicion_registro_tipo_final <- bind_rows(cuadro_total, cuadro_estatal, cuadro_privado, cuadro_otro) %>%
   mutate(across(everything(), ~ replace(., is.na(.), "-")))
-
+# Eliminar los objetos intermedios con rm()
+rm(cuadro_total, cuadro_estatal, cuadro_privado, cuadro_otro)
 # Mostrar el cuadro final
 print(cuadro_estab_condicion_registro_tipo_final)
