@@ -63,7 +63,7 @@ calcular_poblacion_estado_cat_ocup <- function(df) {
   cuadro_cat_ocup <- cuadro_cat_ocup %>%
     mutate(across(Poblacion_Ambos:Poblacion_Mujeres, ~ replace(., is.na(.), "-")))
   
-  return(cuadro_ocupado_cat_ocup)
+  return(cuadro_cat_ocup)
 }
 
 # Aplicar la función al dataset 'base'
