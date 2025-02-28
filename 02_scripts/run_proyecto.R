@@ -1,7 +1,7 @@
 # 🚀 Script maestro para ejecutar todo el flujo de análisis de precariedad laboral
-#source("run_proyecto.R")
+source("run_proyecto.R")
 # 1️⃣ Cargar datos
-source("scripts/01_carga_datos.R")
+source("scripts/01_carga_datos_y_librerias.R")
 
 # 2️⃣ Generar variables sociodemográficas
 source("scripts/02_variables_persona.R")
