@@ -1,7 +1,7 @@
 # Cargar base original
-base <- readRDS("data/base_original.rds")
+base <- readRDS("01_data/Input_original/base_original.rds")
 
-# Crear variables
+# Crear variables rango_etario y nivel.ed1
 base <- base %>%
   mutate(
     rango_etario = case_when(
@@ -26,4 +26,4 @@ base <- base %>%
   )
 
 # Guardar base con variables personales
-saveRDS(base, "data/base_persona.rds")
+saveRDS(base, "01_data/outputs_filtros/base_persona.rds")

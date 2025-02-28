@@ -1,5 +1,5 @@
 # Cargar base de asalariados
-base_asalariados <- readRDS("data/base_asalariados.rds")
+base_asalariados <- readRDS("01_data/outputs_filtros/base_asalariados.rds")
 
 # Crear variables de precariedad
 base_asalariados <- base_asalariados %>%
@@ -15,4 +15,4 @@ base_asalariados <- base_asalariados %>%
   )
 
 # Guardar base con precariedad
-saveRDS(base_asalariados, "data/base_precariedad.rds")
+saveRDS(base_asalariados, "01_data/outputs_filtros/base_precariedad.rds")

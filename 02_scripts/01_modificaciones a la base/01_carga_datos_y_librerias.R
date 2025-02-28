@@ -8,4 +8,4 @@ base <- get_microdata(year = 2023, trimester = 3, type = "individual", vars = "a
   organize_labels(type = "individual")
 
 # Guardar base sin modificaciones
-saveRDS(base, "data/base_original.rds")
+saveRDS(base, "01_data/input_original/base_original.rds")

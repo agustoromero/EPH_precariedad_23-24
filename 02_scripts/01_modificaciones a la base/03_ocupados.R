@@ -1,9 +1,9 @@
 # Cargar base
-base <- readRDS("data/base_persona.rds")
+base <- readRDS("01_data/outputs_filtros/base_persona.rds")
 
 # Filtrar ocupados
 base_ocupados <- base %>%
   filter(ESTADO == 1)
 
 # Guardar base ocupados
-saveRDS(base_ocupados, "data/base_ocupados.rds")
+saveRDS(base_ocupados, "01_data/outputs_filtros/base_ocupados.rds")
