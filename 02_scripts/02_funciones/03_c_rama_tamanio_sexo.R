@@ -39,10 +39,10 @@ calcular_rama_tamanio_sexo <- function(df) {
 }
 
 # Aplicar la función
-cuadro_rama_tamanio_sexo_final <- calcular_rama_tamanio_sexo(base)
+c.3_rama_tamanio_sexo_final <- calcular_rama_tamanio_sexo(base_asalariados)
 
 # Mostrar resultado
-print(cuadro_rama_tamanio_sexo_final)
+print(c.3_rama_tamanio_sexo_final)
 
 
 

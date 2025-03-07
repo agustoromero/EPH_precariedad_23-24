@@ -40,7 +40,7 @@ calcular_niveled_tamanio_sexo <- function(df) {
 }
 
 # Aplicar la función
-cuadro_niveled_tamanio_sexo_final <- calcular_niveled_tamanio_sexo(base)
+c.4_niveled_tamanio_sexo_final <- calcular_niveled_tamanio_sexo(base_asalariados)
 
 # Mostrar resultado
-print(cuadro_niveled_tamanio_sexo_final)
+print(c.4_niveled_tamanio_sexo_final)

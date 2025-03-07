@@ -49,11 +49,11 @@ cuadro_precariedad_sexo <- function(df) {
 }
 
 # Llamar ambas funciones
-cuadro_general <- cuadro_precariedad_ambos(base)
-cuadro_sexo <- cuadro_precariedad_sexo(base)
+cuadro_general <- cuadro_precariedad_ambos(base_asalariados)
+cuadro_sexo <- cuadro_precariedad_sexo(base_asalariados)
 
 # Combinar los resultados con bind_rows
-cuadro_signos_preca_final <- bind_rows(cuadro_general, cuadro_sexo)
+c.8_signos_preca_final <- bind_rows(cuadro_general, cuadro_sexo)
 rm(cuadro_general, cuadro_sexo)
 # Ver el resultado
-cuadro_signos_preca_final
+c.8_signos_preca_final

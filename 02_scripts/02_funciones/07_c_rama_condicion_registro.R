@@ -1,19 +1,19 @@
-#nivel ed y tamaño establecimiento
-C_niveled_estab <- base  %>% filter(ESTADO==1 &  CAT_OCUP==3)  %>%
-  calculate_tabulates(base = base, 
-                      x="nivel.ed",
-                      y="tamanio.establec.nueva",
-                      weights="PONDERA")
-Cvar_niveled_estab <- base  %>% filter(ESTADO==1 &  CAT_OCUP==3 & CH04==1)  %>%
-  calculate_tabulates(base = base, 
-                      x="nivel.ed",
-                y="tamanio.establec.nueva",
-                      weights="PONDERA")
-Cmuj_niveled_estab <- base  %>% filter(ESTADO==1 &  CAT_OCUP==3 & CH04==2)  %>%
-  calculate_tabulates(base = base, 
-                      x="nivel.ed",
-                      y="tamanio.establec.nueva",
-                      weights="PONDERA")
+# #nivel ed y tamaño establecimiento
+# C_niveled_estab <- base  %>% filter(ESTADO==1 &  CAT_OCUP==3)  %>%
+#   calculate_tabulates(base = base, 
+#                       x="nivel.ed",
+#                       y="tamanio.establec.nueva",
+#                       weights="PONDERA")
+# Cvar_niveled_estab <- base  %>% filter(ESTADO==1 &  CAT_OCUP==3 & CH04==1)  %>%
+#   calculate_tabulates(base = base, 
+#                       x="nivel.ed",
+#                 y="tamanio.establec.nueva",
+#                       weights="PONDERA")
+# Cmuj_niveled_estab <- base  %>% filter(ESTADO==1 &  CAT_OCUP==3 & CH04==2)  %>%
+#   calculate_tabulates(base = base, 
+#                       x="nivel.ed",
+#                       y="tamanio.establec.nueva",
+#                       weights="PONDERA")
 
 
 
@@ -48,10 +48,16 @@ calcular_rama_sexo <- function(df) {
 }
 
 # Aplicar la función
-cuadro_rama_sexo_final <- calcular_rama_sexo(base)
+c.7.1_rama_sexo_final <- calcular_rama_sexo(base)
 
 # Mostrar resultado
-print(cuadro_rama_sexo_final)
+print(c.7.1_rama_sexo_final)
+
+
+
+
+
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # 
 
 
 calcular_rama_condicion_registro <- function(df) {
@@ -89,7 +95,7 @@ calcular_rama_condicion_registro <- function(df) {
 }
 
 # Aplicar la función
-cuadro_rama_condicion_registro_final <- calcular_rama_condicion_registro(base)
+c.7.2_rama_condicion_registro_final <- calcular_rama_condicion_registro(base)
 
 # Mostrar resultado
-print(cuadro_rama_condicion_registro_final)
+print(c.7.2_rama_condicion_registro_final)

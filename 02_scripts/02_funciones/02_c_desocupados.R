@@ -1,4 +1,4 @@
-C_desocupados <- base %>% 
+C.2_desocupados <- base %>% 
   
   summarise( Poblacion           = sum(PONDERA),
              Ocupados            = sum(PONDERA[ESTADO==1]),

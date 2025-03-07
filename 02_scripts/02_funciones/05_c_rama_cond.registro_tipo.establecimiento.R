@@ -29,10 +29,10 @@ calcular_rama_sexo <- function(df) {
 }
 
 # Aplicar la función
-cuadro_rama_sexo_final <- calcular_rama_sexo(base)
+c.5.1_rama_sexo_final <- calcular_rama_sexo(base)
 
 # Mostrar resultado
-print(cuadro_rama_sexo_final)
+print(c.5.1_rama_sexo_final)
 
 
 ###################################################
@@ -74,7 +74,7 @@ calcular_rama_condicion_registro <- function(df) {
 }
 
 # Aplicar la función
-cuadro_rama_condicion_registro_final <- calcular_rama_condicion_registro(base)
+c.5.2_rama_condicion_registro_final <- calcular_rama_condicion_registro(base)
 
 # Mostrar resultado
-print(cuadro_rama_condicion_registro_final)
+print(c.5.2_rama_condicion_registro_final)

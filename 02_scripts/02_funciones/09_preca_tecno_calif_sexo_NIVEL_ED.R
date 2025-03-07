@@ -3,7 +3,7 @@
 # Analizar la precariedad tecno_calif por sexo
 
 tabla_preca_TC_sexo <- calculate_tabulates(
-  base = base,
+  base = base_asalariados,
   x = "CH04",
   y = "preca_tecno_calif",
   weights = "PONDERA"
@@ -14,14 +14,14 @@ print(tabla_preca_TC_sexo)
 
 # Analizar la precariedad por nivel educativo
 tabla_preca_TC_educ <- calculate_tabulates(
-  base = base,            #ambos sexos
+  base = base_asalariados,            #ambos sexos
   x = "NIVEL_ED",
   y = "preca_tecno_calif",
   weights = "PONDERA") %>% 
   mutate(sexo = "Ambos")
 print(tabla_preca_TC_educ)
 
-tabla_precaTC_educ_varon <- base %>% 
+tabla_precaTC_educ_varon <- base_asalariados %>% 
   filter(CH04 == "1") %>%  # solo varones
   calculate_tabulates(
     x = "NIVEL_ED",
@@ -31,7 +31,7 @@ tabla_precaTC_educ_varon <- base %>%
 print(tabla_precaTC_educ_varon)
 
 
-tabla_precaTC_educ_mujer <- base %>% 
+tabla_precaTC_educ_mujer <- base_asalariados %>% 
   filter(CH04 == "2") %>%  #  solo mujeres
   calculate_tabulates(
     x = "NIVEL_ED",
@@ -40,14 +40,16 @@ tabla_precaTC_educ_mujer <- base %>%
   mutate(sexo = "mujer")
 print(tabla_precaTC_educ_mujer)
 
-tabla_precaTC_educ_sexo_tot <- bind_rows(tabla_preca_TC_educ, tabla_precaTC_educ_varon, tabla_precaTC_educ_mujer)
+c.9.1_precaTC_educ_sexo_final <- bind_rows(tabla_preca_TC_educ, tabla_precaTC_educ_varon, tabla_precaTC_educ_mujer)
 
 
 
+
+#######################################################################33
 
 
 # Crear tabla para ambos sexos por rango etario
-tabla_precaTC_edad <- base %>%  
+tabla_precaTC_edad <- base_asalariados %>%  
   calculate_tabulates(
     x = "rango_etario", 
     y = "preca_tecno_calif", 
@@ -79,7 +81,7 @@ print(tabla_precaTC_edad_con_totales)
 
 
 # Crear tabla base para los varones por rango etario
-tabla_precaTC_edad_varon <- base %>%  
+tabla_precaTC_edad_varon <- base_asalariados %>%  
   filter(CH04 == "1") %>%  # Solo varones
   calculate_tabulates(
     x = "rango_etario", 
@@ -109,7 +111,7 @@ tabla_precaTC_edad_varon_con_totales <- bind_rows(tabla_precaTC_edad_varon, tota
 print(tabla_precaTC_edad_varon_con_totales)
 
 # Crear tabla base para las mujeres por rango etario
-tabla_precaTC_edad_mujer <- base %>%  
+tabla_precaTC_edad_mujer <- base_asalariados %>%  
   filter(CH04 == "2") %>%  # Solo mujeres
   calculate_tabulates(
     x = "rango_etario", 
@@ -140,7 +142,7 @@ print(tabla_precaTC_edad_mujer_con_totales)
 
 
 # Combinar las tablas de ambos sexos, varones y mujeres en una sola tabla final
-tabla_precaTC_edad_final <- bind_rows(
+c.9.2_precaTC_edad_final <- bind_rows(
   tabla_precaTC_edad_con_totales, 
   tabla_precaTC_edad_varon_con_totales, 
   tabla_precaTC_edad_mujer_con_totales
@@ -148,16 +150,16 @@ tabla_precaTC_edad_final <- bind_rows(
   mutate(across(everything(), ~ replace(., is.na(.), "-")))
 
 # Ver la tabla final
-print(tabla_precaTC_edad_final)
+print(c.9.2_precaTC_edad_final)
 
 
-
+################################################################################
 
 
 #Precariedad_tecno_calif_antiguedad
 
 # Crear tabla para ambos sexos
-tabla_precaTC_ant <- base %>%  
+tabla_precaTC_ant <- base_asalariados %>%  
   calculate_tabulates(
     x = "antiguedad_empleo",
     y = "preca_tecno_calif",
@@ -191,7 +193,7 @@ print(tabla_precaTC_ant_con_totales)
 
   
 # Crear tabla base para los varones
-tabla_precaTC_ant_varon <- base %>%  
+tabla_precaTC_ant_varon <- base_asalariados %>%  
   filter(CH04 == "1") %>%  # Solo varones
   calculate_tabulates(
     x = "antiguedad_empleo",
@@ -223,7 +225,7 @@ print(tabla_precaTC_ant_varon_con_totales)
   
   
 # Crear tabla base para los mujeres  
-  tabla_precaTC_ant_mujer <- base %>%  
+  tabla_precaTC_ant_mujer <- base_asalariados %>%  
     filter(CH04 == "2") %>%  # Solo mujeres
     calculate_tabulates(
       x = "antiguedad_empleo",
@@ -253,7 +255,7 @@ print(tabla_precaTC_ant_varon_con_totales)
  
   
   
-   tabla_precaTC_ant_FINAL <- bind_rows(tabla_precaTC_ant_con_totales, tabla_precaTC_ant_varon_con_totales, tabla_precaTC_ant_mujer_con_totales) %>%
+   c.9.3_precaTC_ant_FINAL <- bind_rows(tabla_precaTC_ant_con_totales, tabla_precaTC_ant_varon_con_totales, tabla_precaTC_ant_mujer_con_totales) %>%
      mutate(across(everything(), ~ replace(., is.na(.), "-")))
   
 #libero ambiente de trabajo
@@ -264,7 +266,7 @@ print(tabla_precaTC_ant_varon_con_totales)
                 "tabla_precaTC_edad_varon_con_totales", "tabla_precaTC_edad_mujer_con_totales",
                 "tabla_precaTC_ant_mujer", "tabla_precaTC_ant_mujer_con_totales", "tabla_precaTC_ant_varon",
                 "tabla_precaTC_ant_varon_con_totales", "tabla_precaTC_edad", "tabla_precaTC_edad_con_totales",
-                "tabla_precaTC_edad_mujer", "table_precaTC_edad_mujer_con_totales")
+                "tabla_precaTC_edad_mujer", "table_precaTC_edad_mujer_con_totales", "tabla_precaTC_educ", "tabla_precaTC_educ_sexo_tot")
    
    rm(list = intersect(objetos, ls()))
    

@@ -3,7 +3,7 @@ calcular_poblacion_estado <- function(df) {
   df$ESTADO <- as.factor(df$ESTADO)
   
 #Calcular totales por ESTADO (0, 1, 2, 3, 4) y por sexo (Ambos, Varones, Mujeres)
-cuadro_estado_sexo <- df %>%
+c.1.1_estado_sexo <- df %>%
   group_by(ESTADO) %>%
   summarise(
     Poblacion_Ambos = sum(PONDERA, na.rm = TRUE),
@@ -13,20 +13,20 @@ cuadro_estado_sexo <- df %>%
   )
 
 # Asignar los nombres correspondientes a los niveles del factor
-levels(cuadro_estado_sexo$ESTADO) <- c("Entrevista no realizada", "Ocupado", "Desocupado", "Inactivo", "Menor de 10 años")
+levels(c.1.1_estado_sexo$ESTADO) <- c("Entrevista no realizada", "Ocupado", "Desocupado", "Inactivo", "Menor de 10 años")
 
 # Reemplazar NAs por "-" en las columnas de población
-cuadro_estado_sexo <- cuadro_estado_sexo %>%
+c.1.1_estado_sexo <- c.1.1_estado_sexo %>%
   mutate(across(Poblacion_Ambos:Poblacion_Mujeres, ~ replace(., is.na(.), "-")))
 
-return(cuadro_estado_sexo)
+return(c.1.1_estado_sexo)
 }
 
 # Aplicar la función al dataset 'base'
-cuadro_estado_final <- calcular_poblacion_estado(base)
+c.1.1_estado_final <- calcular_poblacion_estado(base)
 
 # Mostrar el resultado
-print(cuadro_estado_final)
+print(c.1.1_estado_final)
 
 
 
@@ -46,7 +46,7 @@ calcular_poblacion_estado_cat_ocup <- function(df) {
   df_ocupado$CAT_OCUP <- as.factor(df_ocupado$CAT_OCUP)
   
   # Calcular los totales por CAT_OCUP (solo para ESTADO == 1) y por sexo (Ambos, Varones, Mujeres)
-  cuadro_cat_ocup <- df_ocupado %>%
+  c.1.2_cat_ocup <- df_ocupado %>%
     group_by(CAT_OCUP) %>%
     summarise(
       Poblacion_Ambos = sum(PONDERA, na.rm = TRUE),
@@ -56,18 +56,18 @@ calcular_poblacion_estado_cat_ocup <- function(df) {
     )
   
   # Asignar nombres a las categorías de CAT_OCUP
-  levels(cuadro_cat_ocup$CAT_OCUP) <- c("Patrón", "Cuenta propia", "Obrero o empleado", 
+  levels(c.1.2_cat_ocup$CAT_OCUP) <- c("Patrón", "Cuenta propia", "Obrero o empleado", 
                                                 "Trabajador familiar sin remuneración", "Ns./Nr.")
   
   # Reemplazar NAs por "-" en las columnas de población
-  cuadro_cat_ocup <- cuadro_cat_ocup %>%
+  c.1.2_cat_ocup <- c.1.2_cat_ocup %>%
     mutate(across(Poblacion_Ambos:Poblacion_Mujeres, ~ replace(., is.na(.), "-")))
   
-  return(cuadro_cat_ocup)
+  return(c.1.2_cat_ocup)
 }
 
 # Aplicar la función al dataset 'base'
-cuadro_cat_ocup_final <- calcular_poblacion_estado_cat_ocup(base)
+c.1.2_cat_ocup_final <- calcular_poblacion_estado_cat_ocup(base)
 
 # Mostrar el resultado
-print(cuadro_cat_ocup_final)
+print(c.1.2_cat_ocup_final)
