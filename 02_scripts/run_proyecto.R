@@ -2,7 +2,6 @@
 
 # Carpeta 01_modificaciones a la base
 source("02_scripts/01_modificaciones_a_la_base/01_carga_datos_y_librerias.R")
-source("02_scripts/01_modificaciones_a_la_base/01_carga_datos_y_librerias.R")
 source("02_scripts/01_modificaciones_a_la_base/02_variables_persona.R")
 source("02_scripts/01_modificaciones_a_la_base/03_ocupados.R")
 source("02_scripts/01_modificaciones_a_la_base/04_asalariados.R")
