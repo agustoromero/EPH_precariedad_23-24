@@ -41,5 +41,5 @@ print(tabla_precaSS_educ_mujer)
 c.91_precaSS_educ_sexo_final <- bind_rows(tabla_preca_SS_educ, tabla_precaSS_educ_varon, tabla_precaSS_educ_mujer)
 
 # Limpiar el entorno de trabajo de las variables no necesarias
-objetos <- c("tabla_precaSS_educ_varon", "tabla_precaSS_educ_mujer", "tabla_preca_SS_sexo")
+objetos <- c("tabla_precaSS_educ_varon", "tabla_precaSS_educ_mujer", "tabla_preca_SS_sexo", "tabla_preca_SS_educ")
 rm(list = intersect(objetos, ls()))

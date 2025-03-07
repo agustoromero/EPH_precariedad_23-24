@@ -266,7 +266,7 @@ print(tabla_precaTC_ant_varon_con_totales)
                 "tabla_precaTC_edad_varon_con_totales", "tabla_precaTC_edad_mujer_con_totales",
                 "tabla_precaTC_ant_mujer", "tabla_precaTC_ant_mujer_con_totales", "tabla_precaTC_ant_varon",
                 "tabla_precaTC_ant_varon_con_totales", "tabla_precaTC_edad", "tabla_precaTC_edad_con_totales",
-                "tabla_precaTC_edad_mujer", "table_precaTC_edad_mujer_con_totales", "tabla_precaTC_educ", "tabla_precaTC_educ_sexo_tot")
+                "tabla_precaTC_edad_mujer", "table_precaTC_edad_mujer_con_totales","tabla_preca_TC_educ", "tabla_precaTC_educ", "tabla_precaTC_educ_sexo_tot")
    
    rm(list = intersect(objetos, ls()))
    
