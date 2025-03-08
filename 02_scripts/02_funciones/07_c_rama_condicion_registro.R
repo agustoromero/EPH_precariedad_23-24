@@ -14,45 +14,45 @@
 #                       x="nivel.ed",
 #                       y="tamanio.establec.nueva",
 #                       weights="PONDERA")
-
-
-
-calcular_rama_sexo <- function(df) {
-  cuadro_base <- df %>% 
-    filter(ESTADO == 1 & CAT_OCUP == 3) %>% 
-    group_by(caes_seccion_label) %>% 
-    summarise(
-      Poblacion_Ambos = sum(PONDERA, na.rm = TRUE),
-      Poblacion_Varones = sum(PONDERA[CH04 == 1], na.rm = TRUE),
-      Poblacion_Mujeres = sum(PONDERA[CH04 == 2], na.rm = TRUE),
-      .groups = "drop"
-    ) %>%
-    mutate(
-      Prop_Ambos = Poblacion_Ambos / sum(Poblacion_Ambos, na.rm = TRUE),
-      Prop_Varones = Poblacion_Varones / Poblacion_Ambos,
-      Prop_Mujeres = Poblacion_Mujeres / Poblacion_Ambos
-    )
-  
-  # Calcular fila de total
-  total_fila <- cuadro_base %>%
-    summarise(
-      caes_seccion_label = "Total",
-      across(where(is.numeric), sum, na.rm = TRUE)
-    )
-  
-  # Unir resultados
-  cuadro_final <- bind_rows(cuadro_base, total_fila) %>%
-    mutate(across(everything(), ~ replace(., is.na(.), "-")))
-  
-  return(cuadro_final)
-}
-
-# Aplicar la función
-c.7.1_rama_sexo_final <- calcular_rama_sexo(base)
-
-# Mostrar resultado
-print(c.7.1_rama_sexo_final)
-
+# 
+# 
+# 
+# calcular_rama_sexo <- function(df) {
+#   cuadro_base <- df %>% 
+#     filter(ESTADO == 1 & CAT_OCUP == 3) %>% 
+#     group_by(caes_seccion_label) %>% 
+#     summarise(
+#       Poblacion_Ambos = sum(PONDERA, na.rm = TRUE),
+#       Poblacion_Varones = sum(PONDERA[CH04 == 1], na.rm = TRUE),
+#       Poblacion_Mujeres = sum(PONDERA[CH04 == 2], na.rm = TRUE),
+#       .groups = "drop"
+#     ) %>%
+#     mutate(
+#       Prop_Ambos = Poblacion_Ambos / sum(Poblacion_Ambos, na.rm = TRUE),
+#       Prop_Varones = Poblacion_Varones / Poblacion_Ambos,
+#       Prop_Mujeres = Poblacion_Mujeres / Poblacion_Ambos
+#     )
+#   
+#   # Calcular fila de total
+#   total_fila <- cuadro_base %>%
+#     summarise(
+#       caes_seccion_label = "Total",
+#       across(where(is.numeric), sum, na.rm = TRUE)
+#     )
+#   
+#   # Unir resultados
+#   cuadro_final <- bind_rows(cuadro_base, total_fila) %>%
+#     mutate(across(everything(), ~ replace(., is.na(.), "-")))
+#   
+#   return(cuadro_final)
+# }
+# 
+# # Aplicar la función
+# c.7.1_rama_sexo_final <- calcular_rama_sexo(base_asalariados)
+# 
+# # Mostrar resultado
+# print(c.7.1_rama_sexo_final)
+# 
 
 
 

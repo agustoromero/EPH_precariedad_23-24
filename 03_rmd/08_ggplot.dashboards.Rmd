@@ -6,25 +6,137 @@ output: html_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+# Configuración inicial
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+library(dplyr)
+library(ggplot2)
+library(plotly)
+library(tidyr)
+library(knitr)
+library(DT)
 ```
 
-## R Markdown
+# 1. Exploración de la Estructura del Proyecto y Ambiente de Trabajo
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+## 1.1 Listado de Carpetas y Archivos
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
-
-```{r cars}
-summary(cars)
+```{r}
+archivos <- list.files(path = ".", recursive = TRUE, full.names = TRUE) 
+print(archivos)
 ```
 
-## Including Plots
+### 1.2 Listado y Detalles de Objetos en el Ambiente
 
-You can also embed plots, for example:
+```{r}
+objetos <- ls()
+cat("Objetos en el ambiente:\n")
+print(objetos)
 
-```{r pressure, echo=FALSE}
-plot(pressure)
+for (obj in objetos) {
+  valor <- get(obj)
+  cat("Objeto:", obj, "\n")
+  cat("Clase:", class(valor), "\n")
+  if (is.data.frame(valor)) {
+    cat("Dimensiones:", paste(dim(valor), collapse = " x "), "\n")
+    cat("Número de variables:", ncol(valor), "\n")
+  }
+  cat("\n")
+}
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+# 2. Tablas Estáticas (Cortes del Trimestre)
+
+## 2.1 Cuadros de la Población General
+
+Estos cuadros (de c.1.1 a c.7.2) muestran información desagregada que sirve para el análisis general.
+
+```{r}
+kable(c.1.1_estado_final, caption = "Cuadro c.1.1: Estado Final")
+kable(c.1.2_cat_ocup_final, caption = "Cuadro c.1.2: Categoría de Ocupación")
+kable(c.3_rama_tamanio_sexo_final, caption = "Cuadro c.3: Rama, Tamaño y Sexo")
+kable(c.4_niveled_tamanio_sexo_final, caption = "Cuadro c.4: Nivel Educativo y Tamaño")
+kable(c.5.1_rama_sexo_final, caption = "Cuadro c.5.1: Rama por Sexo")
+kable(c.5.2_rama_condicion_registro_final, caption = "Cuadro c.5.2: Rama por Condición de Registro")
+kable(c.6_estab_condicion_registro_tipo_final, caption = "Cuadro c.6: Establecimiento por Condición de Registro Tipo")
+kable(c.7.1_rama_sexo_final, caption = "Cuadro c.7.1: Rama por Sexo")
+kable(c.7.2_rama_condicion_registro_final, caption = "Cuadro c.7.2: Rama por Condición de Registro")
+
+```
+
+## 2.2 Cuadros que definen la precariedad según los signos (del 1 al 4), y se destacan los casos de PrecaTC y PrecaSS.
+
+```{r}
+kable(c.8_signos_preca_final, caption = "Cuadro c.8: Distribución de Signos de Precariedad"); kable(c.9.1_precaTC_educ_sexo_final, caption = "Cuadro c.9.1: PrecaTC - Distribución por Educación y Sexo") ;
+kable(c.9.2_precaTC_edad_final, caption = "Cuadro c.9.2: PrecaTC - Distribución por Edad"); kable(c.9.3_precaTC_ant_FINAL, caption = "Cuadro c.9.3: PrecaTC - Distribución por Antigüedad"); kable(c.91_precaSS_educ_sexo_final, caption = "Cuadro c.91: PrecaSS - Distribución por Educación y Sexo")
+```
+
+# 3 Análisis de la precariedad
+
+## 3.1 Distribución de Signos de Precariedad según Sexo En este ejemplo, utilizamos el cuadro c.8_signos_preca_final. Se asume que contiene las columnas "signo", "sexo" y "conteo".
+
+```{r}
+
+if (exists("c.8_signos_preca_final") &&
+    all(c("signo", "sexo", "conteo") %in% names(c.8_signos_preca_final))) {
+  
+  p_signos <- ggplot(c.8_signos_preca_final, aes(x = as.factor(signo), y = conteo, fill = sexo)) +
+    geom_bar(stat = "identity", position = "dodge") +
+    labs(title = "Distribución de Signos de Precariedad según Sexo",
+         x = "Signo de Precariedad",
+         y = "Conteo") +
+    theme_minimal()
+  
+  ggplotly(p_signos)
+} else {
+  cat("Falta alguna variable en c.8_signos_preca_final.\n")
+}
+```
+
+## 3.2 Distribución de PrecaTC por Educación y Sexo Utilizamos el cuadro c.9.1_precaTC_educ_sexo_final. Se asume que tiene las columnas "educacion", "sexo" y "conteo".
+
+```{r}
+
+if (exists("c.9.1_precaTC_educ_sexo_final") &&
+    all(c("educacion", "sexo", "conteo") %in% names(c.9.1_precaTC_educ_sexo_final))) {
+  
+  p_precaTC <- ggplot(c.9.1_precaTC_educ_sexo_final, aes(x = educacion, y = conteo, fill = sexo)) +
+    geom_bar(stat = "identity", position = "dodge") +
+    labs(title = "PrecaTC: Distribución por Educación y Sexo",
+         x = "Nivel Educativo",
+         y = "Conteo") +
+    theme_minimal()
+  
+  ggplotly(p_precaTC)
+} else {
+  cat("Falta alguna variable en c.9.1_precaTC_educ_sexo_final.\n")
+}
+
+```
+
+## 3.3 Distribución de PrecaSS por Educación y Sexo.
+
+Utilizamos el cuadro c.91_precaSS_educ_sexo_final, asumiendo columnas similares a las del anterior.
+
+```{r}
+if (exists("c.91_precaSS_educ_sexo_final") &&
+    all(c("educacion", "sexo", "conteo") %in% names(c.91_precaSS_educ_sexo_final))) {
+  
+  p_precaSS <- ggplot(c.91_precaSS_educ_sexo_final, aes(x = educacion, y = conteo, fill = sexo)) +
+    geom_bar(stat = "identity", position = "dodge") +
+    labs(title = "PrecaSS: Distribución por Educación y Sexo",
+         x = "Nivel Educativo",
+         y = "Conteo") +
+    theme_minimal()
+  
+  ggplotly(p_precaSS)
+} else {
+  cat("Falta alguna variable en c.91_precaSS_educ_sexo_final.\n")
+}
+
+```
+
+# 4. Filtros Interactivos en Tablas de Cuadros
+
+```{r}
+DT::datatable(c.8_signos_preca_final, filter = "top", caption = "Tabla interactiva: Distribución de Signos de Precariedad")
+```
