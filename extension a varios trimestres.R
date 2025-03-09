@@ -552,13 +552,102 @@ calcular_rama_sexo_trimestral <- function(df) {
 c.7.1_rama_sexo_consolidado <- calcular_rama_sexo_trimestral(base_asalariados)
 
 
+calcular_rama_condicion_registro_trimestral <- function(df) {
+  cuadro_base <- df %>%
+    filter(ESTADO == 1, CAT_OCUP == 3) %>%
+    group_by(TRIMESTRE, caes_seccion_label) %>%
+    summarise(
+      total = sum(PONDERA[CAT_OCUP == 3], na.rm = TRUE),
+      Asal_protegidos = sum(PONDERA[CAT_OCUP == 3 & PP07H == 1], na.rm = TRUE),
+      Asal_precarios_tot = sum(PONDERA[CAT_OCUP == 3 & PP07H == 2], na.rm = TRUE),
+      Asal_precarios_i1_mono = sum(PONDERA[CAT_OCUP == 3 & PP07I == 1], na.rm = TRUE),
+      Asal_precarios_i2_negr = sum(PONDERA[CAT_OCUP == 3 & PP07I == 2], na.rm = TRUE),
+      .groups = "drop"
+    ) %>%
+    mutate(
+      part_asal_prote = Asal_protegidos / total,
+      part_asal_precarios = Asal_precarios_tot / total,
+      part_mono_en_precarios = Asal_precarios_i1_mono / Asal_precarios_tot,
+      part_negro_en_precarios = Asal_precarios_i2_negr / Asal_precarios_tot,
+      part_NSNR_en_precarios = (total - Asal_precarios_i1_mono - Asal_precarios_i2_negr) / Asal_precarios_tot
+    )
+  
+  # Calcular fila de total por trimestre
+  total_fila <- cuadro_base %>%
+    group_by(TRIMESTRE) %>%
+    summarise(
+      caes_seccion_label = "Total",
+      across(where(is.numeric), sum, na.rm = TRUE)
+    )
+  
+  # Unir resultados
+  cuadro_final <- bind_rows(cuadro_base, total_fila) %>%
+    mutate(across(everything(), ~ replace(., is.na(.), "-")))
+  
+  return(cuadro_final)
+}
 
+# Aplicar la función
+c.7.2_rama_condicion_registro_final <- calcular_rama_condicion_registro_trimestral(base)
+
+# Mostrar resultado
+print(c.7.2_rama_condicion_registro_final)
 
 #############################################################################
 
 #script 08
 
 
+cuadro_precariedad_ambos_trimestral <- function(df) {
+  indicadores <- df %>%
+    group_by(TRIMESTRE) %>%
+    summarise(
+      Total = n(),
+      "Signo 1: Educación-Tamaño" = sum(signo_educ_tamaño, na.rm = TRUE),
+      "Signo 2: Sin Descuento Jubilatorio" = sum(signo_sindescuento, na.rm = TRUE),
+      "Signo 3: Tiempo (PT involuntario + Indeterminado)" = sum(signo_tiempo, na.rm = TRUE),
+      "Signo 4: Tecnología-Calificación" = sum(signo_tecno_calif, na.rm = TRUE),
+      "Total con al menos 1 de 3" = sum(almenos1de3, na.rm = TRUE),
+      "Total sin signos de precariedad" = sum(sin_preca_de3, na.rm = TRUE),
+      .groups = "drop"
+    ) %>%
+    pivot_longer(cols = -c(Total, TRIMESTRE), names_to = "Indicador", values_to = "Frecuencia_ambos") %>%
+    mutate(Proporcion_ambos = round(Frecuencia_ambos / Total * 100, 2)) %>%
+    pivot_wider(names_from = TRIMESTRE, values_from = c(Frecuencia_ambos, Proporcion_ambos))
+  
+  return(indicadores)
+}
+
+cuadro_precariedad_sexo_trimestral <- function(df) {
+  indicadores <- df %>%
+    group_by(TRIMESTRE, CH04) %>%  # CH04 es la columna de sexo
+    summarise(
+      Total = n(),
+      "Signo 1: Educación-Tamaño" = sum(signo_educ_tamaño, na.rm = TRUE),
+      "Signo 2: Sin Descuento Jubilatorio" = sum(signo_sindescuento, na.rm = TRUE),
+      "Signo 3: Tiempo (PT involuntario + Indeterminado)" = sum(signo_tiempo, na.rm = TRUE),
+      "Signo 4: Tecnología-Calificación" = sum(signo_tecno_calif, na.rm = TRUE),
+      "Total con al menos 1 de 3" = sum(almenos1de3, na.rm = TRUE),
+      "Total sin signos de precariedad" = sum(sin_preca_de3, na.rm = TRUE),
+      .groups = "drop"
+    ) %>%
+    pivot_longer(cols = -c(Total, CH04, TRIMESTRE), names_to = "Indicador", values_to = "Frecuencia") %>%
+    mutate(Proporcion = round(Frecuencia / Total * 100, 2)) %>%
+    pivot_wider(names_from = c(TRIMESTRE, CH04), values_from = c(Frecuencia, Proporcion)) 
+  
+  return(indicadores)
+}
+
+# Llamar ambas funciones
+cuadro_general <- cuadro_precariedad_ambos_trimestral(base_asalariados)
+cuadro_sexo <- cuadro_precariedad_sexo_trimestral(base_asalariados)
+
+# Combinar los resultados
+c.8_signos_preca_final <- bind_rows(cuadro_general, cuadro_sexo)
+rm(cuadro_general, cuadro_sexo)
+
+# Ver el resultado
+print(c.8_signos_preca_final)
 
 #############################################################################
 
@@ -567,4 +656,58 @@ c.7.1_rama_sexo_consolidado <- calcular_rama_sexo_trimestral(base_asalariados)
 
 #############################################################################
 
-#script 91
+# #script 91
+# 
+# tabla_preca_SS_sexo_trimestral <- calculate_tabulates(
+#   base = base_asalariados,
+#   x = c("TRIMESTRE", "CH04"),  # Sexo por trimestre
+#   y = "signo_sindescuento",
+#   weights = "PONDERA"
+# )
+# print(tabla_preca_SS_sexo_trimestral)
+# 
+# # Análisis por nivel educativo (ambos sexos)
+# tabla_preca_SS_educ_trimestral <- calculate_tabulates(
+#   base = base_asalariados,
+#   x = c("TRIMESTRE", "NIVEL_ED"),
+#   y = "signo_sindescuento",
+#   weights = "PONDERA"
+# ) %>%
+#   mutate(sexo = "Ambos")
+# print(tabla_preca_SS_educ_trimestral)
+# 
+# tabla_precaSS_educ_varon_trimestral <- base_asalariados %>% 
+#   filter(CH04 == "1") %>%  # Solo varones
+#   calculate_tabulates(
+#     x = c("TRIMESTRE", "NIVEL_ED"),
+#     y = "signo_sindescuento",
+#     weights = "PONDERA"
+#   ) %>% 
+#   mutate(sexo = "Varón")
+# print(tabla_precaSS_educ_varon_trimestral)
+# 
+# tabla_precaSS_educ_mujer_trimestral <- base_asalariados %>% 
+#   filter(CH04 == "2") %>%  # Solo mujeres
+#   calculate_tabulates(
+#     x = c("TRIMESTRE", "NIVEL_ED"),
+#     y = "signo_sindescuento",
+#     weights = "PONDERA"
+#   ) %>% 
+#   mutate(sexo = "Mujer")
+# print(tabla_precaSS_educ_mujer_trimestral)
+# 
+# # Consolidar las tablas
+# c.91_precaSS_educ_sexo_final <- bind_rows(
+#   tabla_preca_SS_educ_trimestral, 
+#   tabla_precaSS_educ_varon_trimestral, 
+#   tabla_precaSS_educ_mujer_trimestral
+# )
+# 
+# # Limpiar variables innecesarias
+# objetos <- c("tabla_precaSS_educ_varon_trimestral", "tabla_precaSS_educ_mujer_trimestral", 
+#              "tabla_preca_SS_sexo_trimestral", "tabla_preca_SS_educ_trimestral")
+# rm(list = intersect(objetos, ls()))
+# 
+# # Ver resultado final
+# print(c.91_precaSS_educ_sexo_final)
+# 
