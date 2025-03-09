@@ -686,6 +686,7 @@ c.91_precaSS_educ_sexo_final <- bind_rows(
 objetos <- c("tabla_precaSS_educ_varon_trimestral", "tabla_precaSS_educ_mujer_trimestral",
              "tabla_preca_SS_sexo_trimestral", "tabla_preca_SS_educ_trimestral")
 rm(list = intersect(objetos, ls()))
+c.91_precaSS_educ_sexo_final <- c.91_precaSS_educ_sexo_final %>% select(-total)
 
 # Ver resultado final
 print(c.91_precaSS_educ_sexo_final)
@@ -706,4 +707,7 @@ print(c.91_precaSS_educ_sexo_final)
 #     )
 # }
 
-
+# 
+# total = 50000 significa que los varones del trimestre 2024T1 representan 50,000 personas en la población.
+# conteo = 10000 significa que 10,000 de esas personas tienen y > 0.
+# proporcion = 20% significa que el 20% de los varones en 2024T1 tienen y > 0.
