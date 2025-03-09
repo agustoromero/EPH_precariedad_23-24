@@ -1,0 +1,324 @@
+---
+# title: "R de Resultados"
+author: "Agus Romero y Gaspo Herrero"
+date: "2025-03-09"
+output:
+  html_notebook: 
+    toc: true
+    toc_float: true 
+--- %>% 
+---
+
+# INTRODUCCION
+
+Este es el trabajo de presentación final de Agus y Gaspo.
+
+La idea del Trabajo es hacer un seguimiento general del mercado de trabajo al que le podamos ir incorporando cambios.
+
+Utilizaremos la Encuesta Permanente de Hogares (EPH) del INDEC.
+
+Objetivo: Nos interesa explorar los principales cambios en el Mercado de Trabajo a raíz del nuevo gobierno como guía para explorar las herramientas.
+
+`(Este archivo esta organizado)`
+
+Para trabajar en el entorno compartido de github configuarmos una carpeta de origen de la información (*El pescado*), una carpeta con los Scripts (*El cuchillo*) y una carpeta con los resultados (*Las tripas*).
+
+Como la idea era poder aplicarlo de manera repetida para los distintos trimestres y poder construir series, decidimos que el pescado contenga todas las bases de interes. Que los Scripts trabajan principalmente con funciones que permitan la repitencia trimestre a trimestre. Y en este caso, los resultados, en lugar de ser los presentados en la carpeta resultados, serán presentados en este Markdown (el kanicama).
+
+## Primeros cambios en la base
+
+Construimos un entorno de trabajo y una funcion para descargar la información para luego descargar las y juntarlas, ya listas para trabajar y transformar toda junta.
+
+```{r echo=TRUE}
+# Configuro mi espacio de trabajo y armo las primeras direcciones y funciones
+#Ruta donde se almacenan los archivos RDS
+  ruta_datos <- "01_data/"
+  
+  # Función para importar datos desde RDS
+  importar_datos <- function(ano, trimestre) {
+    archivo <- paste0(ruta_datos, "base_", ano, "_T", trimestre, ".rds")
+    
+    if (file.exists(archivo)) {
+      datos <- readRDS(archivo) %>%
+        mutate(anio_trim = paste0(ANO4, "T", TRIMESTRE))  # Agregar columna para identificación
+      
+      return(datos)
+    } else {
+      message("No se encontró: ", archivo)
+      return(NULL)
+    }
+  }
+  
+  # Definir los trimestres de interés (3T 2023 hasta 2T 2024)
+  trimestres_seleccionados <- expand.grid(
+    ANO4 = 2023:2024, 
+    TRIMESTRE = 1:4
+  ) %>%
+    filter(!(ANO4 == 2023 & TRIMESTRE < 3),  # Excluir antes del 3T 2023
+           !(ANO4 == 2024 & TRIMESTRE > 2))  # Excluir después del 2T 2024
+
+# Importar y combinar todos los archivos
+  lista_datos <- lapply(1:nrow(trimestres_seleccionados), function(i) {
+    importar_datos(trimestres_seleccionados$ANO4[i], 
+                   trimestres_seleccionados$TRIMESTRE[i])
+  })
+  
+  # Unir todas las bases en una sola ####
+  base <- bind_rows(lista_datos)
+
+```
+
+Con la base inicial, incorporamos las variables del CAES y el CNO. Construimos unas variables de rango etario y nivel educativo (diferenciando superior completo e incompleto)
+
+```{r echo=TRUE}
+   
+  # Organizar etiquetas y clasificaciones
+base <- base %>%
+    organize_labels(type = "individual") %>%
+    organize_caes() %>%   # Etiquetas según CAES
+    organize_cno()        # Clasificación según CNO
+  
+head(base)
+# Comienza el juego de las bases #### 
+base <- readRDS("01_data/input_original/bases_originales.rds")
+
+# Crear variables rango_etario y nivel.ed1
+base <- base %>%
+  mutate(
+    rango_etario = case_when(
+      CH06 < 19  ~ "Menor a 19",
+      CH06 >= 19 & CH06 <= 25 ~ "19 a 25",
+      CH06 >= 26 & CH06 <= 35 ~ "26 a 35",
+      CH06 >= 36 & CH06 <= 45 ~ "36 a 45",
+      CH06 >= 46 & CH06 <= 55 ~ "46 a 55",
+      CH06 >= 56 & CH06 <= 65 ~ "56 a 65",
+      CH06 >= 66 & CH06 <= 75 ~ "66 a 75",
+      CH06 >= 76 & CH06 <= 85 ~ "76 a 85",
+      CH06 > 85  ~ "Mayor a 85",
+      TRUE ~ NA_character_
+    ),
+    nivel.ed1 = factor(case_when(
+      NIVEL_ED %in% c(7,1,2,3) ~ "Menor a Secundaria", ###¿primario?
+      NIVEL_ED %in% 4 ~ "Secundaria Completa",
+      NIVEL_ED == 5 ~ "Superior Incompleto",
+      NIVEL_ED == 6 ~ "Superior Completo",
+      TRUE ~ "Ns/Nr"
+    ), levels = c("Menor a Secundaria","Secundaria Completa","Superior Incompleto","Superior Completo"))
+  )
+
+# Filtrar ocupados
+base_ocupados <- base %>%
+  filter(ESTADO == 1)
+
+# Guardar base ocupados
+saveRDS(base_ocupados, "01_data/outputs_filtros/bases_ocupados.rds")
+
+# Cargar base de ocupados
+#base_ocupados <- readRDS("01_data/outputs_filtros/bases_ocupados.rds")
+
+
+```
+
+Como segundos cambios, introducimos las primeras variables para cateogrizar precariedad en la población ocupada. A destacar, esta el cambio en la construcción de la variable de "tamaño del establacimiento" (ver anexo I)
+
+```{r echo=TRUE}
+# Transformaciones a ocupados 
+base_ocupados <- base_ocupados %>%
+  filter(ESTADO== 1) %>%
+  mutate(
+    tamanio.establec.nueva = case_when(
+      !is.na(PP04C99) ~ case_when(
+        PP04C99 == 1 ~ "peque",
+        PP04C99 == 2 ~ "mediano",
+        PP04C99 == 3 ~ "grande",
+        PP04C99 == 9 ~ "NS/NR"
+      ),
+      PP04C == 1 ~ "uni",
+      PP04C %in% c(2, 3, 4, 5) ~ "peque",
+      PP04C %in% c(6, 7, 8) ~ "mediano",
+      PP04C %in% c(9, 10, 11, 12) ~ "grande",
+      TRUE ~ NA_character_
+    ),
+    antiguedad_empleo = case_when(
+      as_factor(PP07A) %in% c("1", "2", "3", "4", "5", "6") ~ as_factor(PP07A),#asalariados
+      as_factor(PP05H) %in% c("1", "2", "3", "4", "5", "6") ~ as_factor(PP05H) #no asalariados (independientes/cuentapropia)
+    ), 
+    antiguedad_empleo = factor(
+      antiguedad_empleo, 
+      levels = c("1", "2", "3", "4", "5", "6"),
+      labels = c("menor a 1 mes", "1 a 3 meses", "más de 3 a 6 meses", 
+                 "más de 6 a 12 meses", "más de 1 año a 5 años", "más de 5 años")
+    )
+  )
+saveRDS(base_ocupados, "01_data/outputs_filtros/bases_ocupados.rds")
+
+```
+
+Con esto ya tenemos preparadas las principales variables para realizar cruces.
+
+A continuación, nos quedamos solo con la población asalariada. Y creamos las principales variables con las que evaluar la precariedad:
+
+(i) Preca_tecno_calif
+
+(ii)nivel.ed
+
+(iii)tamanio.establec
+
+(iv)descuento_jubil
+
+(v)part.time.inv
+
+Identificando como precario aquellos que:
+
+criterios de las dimensiones de la precariedad.
+
+#habría que ver la variable de tamanio de establecimiento.
+
+```{r echo=TRUE}
+base_asalariados <- base_ocupados %>% filter(CAT_OCUP==3)
+# Guardar base asalariados
+saveRDS(base_asalariados, "01_data/outputs_filtros/bases_asalariados.rds")
+# Cargar base de asalariados
+base_asalariados <- readRDS("01_data/outputs_filtros/bases_asalariados.rds")
+# Crear variables de precariedad ####
+base_asalariados <- base_asalariados %>%
+  mutate(
+      # Signo de precariedad tecnológica y de calificación
+      preca_tecno_calif = case_when(
+      TECNOLOGIA == 1 & CALIFICACION == 1 ~ 4,  # Solo cuando ambos son 1
+        TRUE ~ 0 ),
+      
+    # Clasificación de educación
+      nivel.ed = factor(case_when(
+        NIVEL_ED %in% c(7,1,2,3) ~ "Menor a Secundaria",
+        NIVEL_ED %in% c(4,5) ~ "Secundaria Completa",
+        NIVEL_ED == 6 ~ "Superior Completo",
+        TRUE ~ "Ns/Nr"),
+        levels = c("Menor a Secundaria","Secundaria Completa","Superior Completo")),
+    
+    # Clasificación de tamaño del establecimiento
+    tamanio.establec = factor(case_when(
+      PP04C %in% 1:6  ~ "Pequeño",
+      PP04C %in% 7:8  ~ "Mediano",
+      PP04C %in% 9:12 ~ "Grande",
+      PP04C %in% 99   ~ "Ns/Nr"
+    ), levels = c("Pequeño","Mediano","Grande","Ns/Nr")),
+    descuento_jubil = case_when(PP07H == 1 ~ "1", PP07H == 2 ~ "0"),
+    part.time.inv = case_when(PP3E_TOT < 35 & PP03G == 1 ~ "1", TRUE ~ "0"),
+    tiempo.determinado = case_when(PP07C == 1 ~ "1", TRUE ~ "0"),
+    signo_educ_tamaño = as.integer(nivel.ed == "Menor a Secundaria" & tamanio.establec == "Pequeño"),  # 1er signo
+    signo_sindescuento = as.integer(descuento_jubil == "0"),  # 2do signo
+    signo_tiempo = as.integer(part.time.inv == "1" & tiempo.determinado == "0"),  # 3er signo
+    signo_tecno_calif = as.integer(preca_tecno_calif == 4),  # 4to signo
+    total_precario = signo_educ_tamaño + signo_sindescuento + signo_tiempo + signo_tecno_calif)
+
+# Guardar base con precariedad
+saveRDS(base_asalariados, "01_data/outputs_filtros/bases_precariedad.rds")
+
+```
+
+```{r echo=TRUE, message=TRUE, warning=TRUE, paged.print=TRUE}
+filtrar_por_trimestre <- function(df, anio, trimestre) {
+  # Crear la columna anio.trim para el formato YYYYTn
+  df <- df %>%
+    mutate(anio_trim = paste(ANO4, "T", TRIMESTRE, sep = ""))
+  
+  # Filtrar el dataframe usando str_detect para los patrones "YYYYTn"
+  df_filtrado <- df %>%
+    filter(str_detect(anio_trim, paste(anio, "T", trimestre, sep = "")))
+  
+  return(df_filtrado)
+}
+
+# Funciones para cálculos
+calcular_poblacion_estado <- function(df) {
+  # Asegurarnos de que ESTADO sea un factor
+  df$ESTADO <- as.factor(df$ESTADO)
+  
+  c.1.1_estado_sexo <- df %>%
+    group_by(ESTADO, anio_trim) %>%
+    summarise(
+      Poblacion_Ambos = sum(PONDERA, na.rm = TRUE),
+      Poblacion_Varones = sum(PONDERA[CH04 == 1], na.rm = TRUE),
+      Poblacion_Mujeres = sum(PONDERA[CH04 == 2], na.rm = TRUE),
+      .groups = "drop"
+    ) %>%
+    mutate(across(Poblacion_Ambos:Poblacion_Mujeres, ~ replace(., is.na(.), "-")))
+  
+  # Asignar niveles a ESTADO
+  levels(c.1.1_estado_sexo$ESTADO) <- c("Entrevista no realizada", "Ocupado", "Desocupado", "Inactivo", "Menor de 10 años")
+  
+  return(c.1.1_estado_sexo)
+}
+
+calcular_poblacion_estado_cat_ocup <- function(df) {
+  df_ocupado <- df %>%
+    filter(ESTADO == 1)
+  
+  df_ocupado$ESTADO <- as.factor(df_ocupado$ESTADO)
+  df_ocupado$CAT_OCUP <- as.factor(df_ocupado$CAT_OCUP)
+  
+  c.1.2_cat_ocup <- df_ocupado %>%
+    group_by(CAT_OCUP, anio_trim) %>%
+    summarise(
+      Poblacion_Ambos = sum(PONDERA, na.rm = TRUE),
+      Poblacion_Varones = sum(PONDERA[CH04 == 1], na.rm = TRUE),
+      Poblacion_Mujeres = sum(PONDERA[CH04 == 2], na.rm = TRUE),
+      .groups = "drop"
+    ) %>%
+    mutate(across(Poblacion_Ambos:Poblacion_Mujeres, ~ replace(., is.na(.), "-")))
+  
+  levels(c.1.2_cat_ocup$CAT_OCUP) <- c("Patrón", "Cuenta propia", "Obrero o empleado", 
+                                       "Trabajador familiar sin remuneración", "Ns./Nr.")
+  
+  return(c.1.2_cat_ocup)
+}
+
+```
+
+```{r}
+trimestres <- list(
+  "2023_3" = filtrar_por_trimestre(base, "2023", 3),
+  "2023_4" = filtrar_por_trimestre(base, "2023", 4),
+  "2024_1" = filtrar_por_trimestre(base, "2024", 1),
+  "2024_2" = filtrar_por_trimestre(base, "2024", 2))
+
+# Aplicar las funciones a cada trimestre y consolidar los resultados
+c.1.1_resultados <- lapply(trimestres, calcular_poblacion_estado)
+c.1.2_resultados <- lapply(trimestres, calcular_poblacion_estado_cat_ocup)
+
+```
+
+```{r}
+precariedad<- base  %>%
+  mutate(PONDIIO = as.numeric(PONDIIO)) %>% #Evitar integer overflow
+  filter(ESTADO == 1, CAT_OCUP == 3) %>% 
+  group_by(anio_trim) %>% 
+  summarise(asalariados = sum(PONDERA,na.rm = T),
+            salario_prom = weighted.mean(P21,PONDIIO,na.rm = T),
+            registrados = sum(PONDERA[PP07H == 1],na.rm = T),
+            no_registrados = sum(PONDERA[PP07H == 2],na.rm = T),
+            tasa_no_reg = no_registrados/asalariados) %>% 
+  mutate(tasa_no_reg = round(tasa_no_reg,digits = 2),
+         salario_prom = round(salario_prom,digits = 0))
+```
+
+```{r}
+#Nofuncional
+salario_y_no_registro <- base_asalariados %>% 
+  filter(ESTADO == 1, CAT_OCUP == 3) %>% 
+  group_by(anio_trim) %>% 
+  summarise(tasa_no_reg = sum(PONDERA[PP07H == 2])/sum   (PONDERA),
+            salario_prom = weighted.mean(P21,PONDIIO),
+            asalariados = sum(PONDERA))
+
+ggplot(data = salario_y_no_registro,
+       aes(x = salario_prom,
+       y = tasa_no_reg,
+       size = asalariados))+
+  labs(title = "Salario promedio y tasa de no registro por trim",
+       subtitle = "31 Aglomerados",
+       x = "Salario promedio",
+       y = "Tasa de no registro")+
+  scale_x_continuous(labels = scales::number_format(big.mark = ".",decimal.mark = ","))
+```
