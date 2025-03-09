@@ -19,19 +19,19 @@
   
   # Función para descargar y guardar datos en RDS #### 
 # Tiltie esta parte para no repetir con las lineas 40--52
-    # descargar_datos <- function(ano, trimestre) {
-  #   archivo <- paste0(ruta_datos, "base_", ano, "_T", trimestre, ".rds")
-  #   
-  #   if (!file.exists(archivo)) {  # Descargar solo si el archivo no existe
-  #     datos <- get_microdata(year = ano, period = trimestre, type = "individual")
-  #     saveRDS(datos, file = archivo)
-  #     message("Descargado y guardado: ", archivo)
-  #   } else {
-  #     message("Ya existe: ", archivo)
-  #   }
-  # }
-  # 
-  
+  descargar_datos <- function(ano, trimestre) {
+    archivo <- paste0(ruta_datos, "base_", ano, "_T", trimestre, ".rds")
+
+    if (!file.exists(archivo)) {  # Descargar solo si el archivo no existe
+      datos <- get_microdata(year = ano, period = trimestre, type = "individual")
+      saveRDS(datos, file = archivo)
+      message("Descargado y guardado: ", archivo)
+    } else {
+      message("Ya existe: ", archivo)
+    }
+  }
+
+
   # Descargar los archivos necesarios####
   mapply(descargar_datos, 
          trimestres_seleccionados$ANO4, 
@@ -639,7 +639,7 @@ print(c.8_signos_preca_final)
 
 tabla_preca_SS_sexo_trimestral <- calculate_tabulates(
   base = base_asalariados,
-  x = c("TRIMESTRE", "CH04"),  # Sexo por trimestre (Ver : no anda)
+  x = c("anio_trim", "CH04"),  # Sexo por trimestre (Ver : no anda)
   y = "signo_sindescuento",
   weights = "PONDERA"
 )
@@ -648,7 +648,7 @@ print(tabla_preca_SS_sexo_trimestral)
 # Análisis por nivel educativo (ambos sexos)
 tabla_preca_SS_educ_trimestral <- calculate_tabulates(
   base = base_asalariados,
-  x = c("TRIMESTRE", "NIVEL_ED"),
+  x = c("anio_trim", "nivel.ed1"),
   y = "signo_sindescuento",
   weights = "PONDERA"
 ) %>%
@@ -658,7 +658,7 @@ print(tabla_preca_SS_educ_trimestral)
 tabla_precaSS_educ_varon_trimestral <- base_asalariados %>%
   filter(CH04 == "1") %>%  # Solo varones
   calculate_tabulates(
-    x = c("TRIMESTRE", "NIVEL_ED"),
+    x = c("anio_trim", "nivel.ed1"),
     y = "signo_sindescuento",
     weights = "PONDERA"
   ) %>%
@@ -668,7 +668,7 @@ print(tabla_precaSS_educ_varon_trimestral)
 tabla_precaSS_educ_mujer_trimestral <- base_asalariados %>%
   filter(CH04 == "2") %>%  # Solo mujeres
   calculate_tabulates(
-    x = c("TRIMESTRE", "NIVEL_ED"),
+    x = c("anio_trim", "nivel.ed1"),
     y = "signo_sindescuento",
     weights = "PONDERA"
   ) %>%
@@ -689,4 +689,21 @@ rm(list = intersect(objetos, ls()))
 
 # Ver resultado final
 print(c.91_precaSS_educ_sexo_final)
+
+# calculate_tabulates <- function(base, x, y, weights) {
+#   # Validar que `x`, `y` y `weights` existan en la base
+#   if (!all(x %in% names(base))) stop("Algunas variables de 'x' no están en la base de datos.")
+#   if (!(y %in% names(base))) stop("La variable 'y' no está en la base de datos.")
+#   if (!(weights %in% names(base))) stop("La variable de ponderación no está en la base de datos.")
+#   
+#   base %>%
+#     group_by(across(all_of(x))) %>%  
+#     summarise(
+#       total = sum(!!sym(weights), na.rm = TRUE),
+#       conteo = sum(!!sym(weights) * as.numeric(!!sym(y) > 0), na.rm = TRUE),  # Asegurar binarización
+#       proporcion = conteo / total * 100,
+#       .groups = "drop"
+#     )
+# }
+
 
