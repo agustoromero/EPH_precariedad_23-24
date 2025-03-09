@@ -19,19 +19,19 @@
   
   # Función para descargar y guardar datos en RDS #### 
 # Tiltie esta parte para no repetir con las lineas 40--52
-    # descargar_datos <- function(ano, trimestre) {
-  #   archivo <- paste0(ruta_datos, "base_", ano, "_T", trimestre, ".rds")
-  #   
-  #   if (!file.exists(archivo)) {  # Descargar solo si el archivo no existe
-  #     datos <- get_microdata(year = ano, period = trimestre, type = "individual")
-  #     saveRDS(datos, file = archivo)
-  #     message("Descargado y guardado: ", archivo)
-  #   } else {
-  #     message("Ya existe: ", archivo)
-  #   }
-  # }
-  # 
-  
+  descargar_datos <- function(ano, trimestre) {
+    archivo <- paste0(ruta_datos, "base_", ano, "_T", trimestre, ".rds")
+
+    if (!file.exists(archivo)) {  # Descargar solo si el archivo no existe
+      datos <- get_microdata(year = ano, period = trimestre, type = "individual")
+      saveRDS(datos, file = archivo)
+      message("Descargado y guardado: ", archivo)
+    } else {
+      message("Ya existe: ", archivo)
+    }
+  }
+
+
   # Descargar los archivos necesarios####
   mapply(descargar_datos, 
          trimestres_seleccionados$ANO4, 
@@ -332,6 +332,32 @@ c.3_resultados <- lapply(base_asalariados_trimestres, calcular_rama_tamanio_sexo
 c.1.1_consolidado <- bind_rows(c.1.1_resultados)
 c.1.2_consolidado <- bind_rows(c.1.2_resultados)
 c.3_consolidado <- bind_rows(c.3_resultados)
+
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+
+# Agregar proporciones al consolidado c.1.1
+# Convertir a numérico antes de calcular proporciones
+c.1.1_consolidado <- c.1.1_consolidado %>%
+  mutate(
+    Poblacion_Ambos = as.numeric(Poblacion_Ambos),
+    Poblacion_Varones = as.numeric(Poblacion_Varones),
+    Poblacion_Mujeres = as.numeric(Poblacion_Mujeres),
+    Prop_Varones = Poblacion_Varones / Poblacion_Ambos,
+    Prop_Mujeres = Poblacion_Mujeres / Poblacion_Ambos
+  ) %>%
+  replace_na(list(Prop_Varones = 0, Prop_Mujeres = 0))  # Evitar NaN
+# Agregar proporciones al consolidado c.1.2
+c.1.2_consolidado <- c.1.2_consolidado %>%
+  mutate(
+    Poblacion_Ambos = as.numeric(Poblacion_Ambos),
+    Poblacion_Varones = as.numeric(Poblacion_Varones),
+    Poblacion_Mujeres = as.numeric(Poblacion_Mujeres),
+    Prop_Varones = Poblacion_Varones / Poblacion_Ambos,
+    Prop_Mujeres = Poblacion_Mujeres / Poblacion_Ambos
+  ) %>%
+  replace_na(list(Prop_Varones = 0, Prop_Mujeres = 0))  # Evitar NaN
 
 # Ver los resultados #Probaria otra forma de ver (ver )
 str(c.1.1_consolidado)
@@ -639,7 +665,7 @@ print(c.8_signos_preca_final)
 
 tabla_preca_SS_sexo_trimestral <- calculate_tabulates(
   base = base_asalariados,
-  x = c("TRIMESTRE", "CH04"),  # Sexo por trimestre (Ver : no anda)
+  x = c("anio_trim", "CH04"),  # Sexo por trimestre (Ver : no anda)
   y = "signo_sindescuento",
   weights = "PONDERA"
 )
@@ -648,7 +674,7 @@ print(tabla_preca_SS_sexo_trimestral)
 # Análisis por nivel educativo (ambos sexos)
 tabla_preca_SS_educ_trimestral <- calculate_tabulates(
   base = base_asalariados,
-  x = c("TRIMESTRE", "NIVEL_ED"),
+  x = c("anio_trim", "nivel.ed1"),
   y = "signo_sindescuento",
   weights = "PONDERA"
 ) %>%
@@ -658,7 +684,7 @@ print(tabla_preca_SS_educ_trimestral)
 tabla_precaSS_educ_varon_trimestral <- base_asalariados %>%
   filter(CH04 == "1") %>%  # Solo varones
   calculate_tabulates(
-    x = c("TRIMESTRE", "NIVEL_ED"),
+    x = c("anio_trim", "nivel.ed1"),
     y = "signo_sindescuento",
     weights = "PONDERA"
   ) %>%
@@ -668,7 +694,7 @@ print(tabla_precaSS_educ_varon_trimestral)
 tabla_precaSS_educ_mujer_trimestral <- base_asalariados %>%
   filter(CH04 == "2") %>%  # Solo mujeres
   calculate_tabulates(
-    x = c("TRIMESTRE", "NIVEL_ED"),
+    x = c("anio_trim", "nivel.ed1"),
     y = "signo_sindescuento",
     weights = "PONDERA"
   ) %>%
@@ -686,7 +712,28 @@ c.91_precaSS_educ_sexo_final <- bind_rows(
 objetos <- c("tabla_precaSS_educ_varon_trimestral", "tabla_precaSS_educ_mujer_trimestral",
              "tabla_preca_SS_sexo_trimestral", "tabla_preca_SS_educ_trimestral")
 rm(list = intersect(objetos, ls()))
+c.91_precaSS_educ_sexo_final <- c.91_precaSS_educ_sexo_final %>% select(-total)
 
 # Ver resultado final
 print(c.91_precaSS_educ_sexo_final)
 
+# calculate_tabulates <- function(base, x, y, weights) {
+#   # Validar que `x`, `y` y `weights` existan en la base
+#   if (!all(x %in% names(base))) stop("Algunas variables de 'x' no están en la base de datos.")
+#   if (!(y %in% names(base))) stop("La variable 'y' no está en la base de datos.")
+#   if (!(weights %in% names(base))) stop("La variable de ponderación no está en la base de datos.")
+#   
+#   base %>%
+#     group_by(across(all_of(x))) %>%  
+#     summarise(
+#       total = sum(!!sym(weights), na.rm = TRUE),
+#       conteo = sum(!!sym(weights) * as.numeric(!!sym(y) > 0), na.rm = TRUE),  # Asegurar binarización
+#       proporcion = conteo / total * 100,
+#       .groups = "drop"
+#     )
+# }
+
+# 
+# total = 50000 significa que los varones del trimestre 2024T1 representan 50,000 personas en la población.
+# conteo = 10000 significa que 10,000 de esas personas tienen y > 0.
+# proporcion = 20% significa que el 20% de los varones en 2024T1 tienen y > 0.
