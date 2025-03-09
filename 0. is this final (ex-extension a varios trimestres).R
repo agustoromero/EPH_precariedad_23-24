@@ -92,7 +92,7 @@ base <- base %>%
       CH06 > 85  ~ "Mayor a 85",
       TRUE ~ NA_character_
     ),
-    nivel.ed1 = factor(case_when(
+    nivel.ed = factor(case_when(
       NIVEL_ED %in% c(7,1,2,3) ~ "Menor a Secundaria", ###¿primario?
       NIVEL_ED %in% 4 ~ "Secundaria Completa",
       NIVEL_ED == 5 ~ "Superior Incompleto",
@@ -155,15 +155,15 @@ base_asalariados <- base_asalariados %>%
     preca_tecno_calif = case_when(
       TECNOLOGIA == 1 & CALIFICACION == 1 ~ 4,  # Solo cuando ambos son 1
       TRUE ~ 0 ),
-    
     # Clasificación de educación
     nivel.ed = factor(case_when(
-      NIVEL_ED %in% c(7,1,2,3) ~ "Menor a Secundaria",
-      NIVEL_ED %in% c(4,5) ~ "Secundaria Completa",
+      NIVEL_ED %in% c(7,1,2,3) ~ "Menor a Secundaria", ###¿primario?
+      NIVEL_ED %in% 4 ~ "Secundaria Completa",
+      NIVEL_ED == 5 ~ "Superior Incompleto",
       NIVEL_ED == 6 ~ "Superior Completo",
       TRUE ~ "Ns/Nr"
-    ), levels = c("Menor a Secundaria","Secundaria Completa","Superior Completo")),
-    
+    ), levels = c("Menor a Secundaria","Secundaria Completa","Superior Incompleto","Superior Completo"))
+  )    
     # Clasificación de tamaño del establecimiento
     tamanio.establec = factor(case_when(
       PP04C %in% 1:6  ~ "Pequeño",
