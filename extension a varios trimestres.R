@@ -1,46 +1,76 @@
-# Librerías
-library(tidyverse)
-library(eph)
-library(haven)
-library(dplyr)
-library(readr)
-library(openxlsx)
-
-base <-eph::get_microdata( year = 2023:2024, period = 1:4, type = "individual")
-base<- base %>% 
-  mutate(anio_trim  = paste0(ANO4,"T",TRIMESTRE))
-
-# Ruta donde están los archivos RDS #DESCARGAR y Guardar previamente en RDS 
-ruta_datos <- "01_datos/"
-
-# Definir los trimestres de interés
-trimestres_seleccionados <- expand.grid( #genera todas las combinaciones posibles de los valores de los vectores que le pasamos.
-  ANO4 = 2023:2024, 
-  TRIMESTRE = 1:4
-) %>%
-  filter(!(ANO4 == 2023 & TRIMESTRE < 3),  # Excluir antes del 3T 2023
-         !(ANO4 == 2024 & TRIMESTRE > 2))  # Excluir después del 2T 2024
-
-# Crear una función para importar datos
-importar_datos <- function(ano, trimestre) {
-  archivo <- paste0(ruta_datos, "base_", ano, "_T", trimestre, ".rds")
+  # Librerías necesarias
+  library(tidyverse)
+  library(eph)
+  library(haven)
+  library(dplyr)
+  library(readr)
+  library(openxlsx)
   
-  if (file.exists(archivo)) {
-    datos <- readRDS(archivo) %>%
-      mutate(anio_trim = paste0(ANO4, "_T", TRIMESTRE))  # Agregar columna
+  # Ruta donde se almacenan los archivos RDS
+  ruta_datos <- "01_data/"
+  
+  # Definir los trimestres de interés (3T 2023 hasta 2T 2024)
+  trimestres_seleccionados <- expand.grid(
+    ANO4 = 2023:2024, 
+    TRIMESTRE = 1:4
+  ) %>%
+    filter(!(ANO4 == 2023 & TRIMESTRE < 3),  # Excluir antes del 3T 2023
+           !(ANO4 == 2024 & TRIMESTRE > 2))  # Excluir después del 2T 2024
+  
+  # Función para descargar y guardar datos en RDS
+  descargar_datos <- function(ano, trimestre) {
+    archivo <- paste0(ruta_datos, "base_", ano, "_T", trimestre, ".rds")
     
-    return(datos)
-  } else {
-    message("No se encontró: ", archivo)
-    return(NULL)
+    if (!file.exists(archivo)) {  # Descargar solo si el archivo no existe
+      datos <- get_microdata(year = ano, period = trimestre, type = "individual")
+      saveRDS(datos, file = archivo)
+      message("Descargado y guardado: ", archivo)
+    } else {
+      message("Ya existe: ", archivo)
+    }
   }
-}
-
-# Importar y combinar todos los archivos #Interesa tenerlos por separado ? capaz si para corte trasversal 
-lista_datos <- mapply(importar_datos, 
-                      trimestres_seleccionados$ANO4, 
-                      trimestres_seleccionados$TRIMESTRE, 
-                      SIMPLIFY = FALSE)
+  
+  # Descargar los archivos necesarios
+  mapply(descargar_datos, 
+         trimestres_seleccionados$ANO4, 
+         trimestres_seleccionados$TRIMESTRE)
+  
+  # Función para importar datos desde RDS
+  importar_datos <- function(ano, trimestre) {
+    archivo <- paste0(ruta_datos, "base_", ano, "_T", trimestre, ".rds")
+    
+    if (file.exists(archivo)) {
+      datos <- readRDS(archivo) %>%
+        mutate(anio_trim = paste0(ANO4, "T", TRIMESTRE))  # Agregar columna para identificación
+      
+      return(datos)
+    } else {
+      message("No se encontró: ", archivo)
+      return(NULL)
+    }
+  }
+  
+  # Importar y combinar todos los archivos
+  lista_datos <- lapply(1:nrow(trimestres_seleccionados), function(i) {
+    importar_datos(trimestres_seleccionados$ANO4[i], 
+                   trimestres_seleccionados$TRIMESTRE[i])
+  })
+  
+  # Unir todas las bases en una sola
+  datos_completos <- bind_rows(lista_datos)
+  
+  # Vista de los datos importados
+  head(datos_completos)
+  
+  # Organizar etiquetas y clasificaciones
+  datos_completos <- datos_completos %>%
+    organize_labels(type = "individual") %>%
+    organize_caes() %>%   # Etiquetas según CAES
+    organize_cno()        # Clasificación según CNO
+  
+  # Guardar base consolidada
+  saveRDS(datos_completos, "01_data/input_original/bases_originales.rds")
+  
 
 # Unir todas las bases en una sola
 datos_completos <- bind_rows(lista_datos)
@@ -48,18 +78,22 @@ datos_completos <- bind_rows(lista_datos)
 # Vista de los datos importados
 head(datos_completos)
 
-base <- organize_labels(base, type = "individual")
-base <- organize_caes(base)  #labels rama segun caes
-base <- organize_cno(base)
-# Guardar base sin modificaciones
-saveRDS(base, "01_data/input_original/bases_originales.rds")
+# Organizar etiquetas y clasificaciones
+datos_completos <- datos_completos %>%
+  organize_labels(type = "individual") %>%
+  organize_caes() %>%   # Etiquetas según CAES
+  organize_cno()        # Clasificación según CNO
+
+# Guardar base consolidada
+saveRDS(datos_completos, "01_data/input_original/bases_originales.rds")
 
 
-#######################
+
+###########################################################################3
 
 
 # Cargar base original
-base <- readRDS("01_data/Input_original/bases_originales.rds")
+base <- readRDS("01_data/input_original/bases_originales.rds")
 
 # Crear variables rango_etario y nivel.ed1
 base <- base %>%
@@ -110,14 +144,16 @@ base_asalariados <- base_ocupados %>%
   filter(CAT_OCUP == 3) %>%
   mutate(
     tamanio.establec.nueva = case_when(
+      !is.na(PP04C99) ~ case_when(
+        PP04C99 == 1 ~ "peque",
+        PP04C99 == 2 ~ "mediano",
+        PP04C99 == 3 ~ "grande",
+        PP04C99 == 9 ~ "NS/NR"
+      ),
       PP04C == 1 ~ "uni",
       PP04C %in% c(2, 3, 4, 5) ~ "peque",
       PP04C %in% c(6, 7, 8) ~ "mediano",
       PP04C %in% c(9, 10, 11, 12) ~ "grande",
-      PP04C99 == 1 ~ "peque",
-      PP04C99 == 2 ~ "mediano",
-      PP04C99 == 3 ~ "grande",
-      PP04C99 == 9 ~ "NS/NR",
       TRUE ~ NA_character_
     ),
     antiguedad_empleo = case_when(
