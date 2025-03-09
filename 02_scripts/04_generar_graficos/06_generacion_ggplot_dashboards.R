@@ -1,43 +1,37 @@
-# Supongamos que los cuadros ahora incluyen la columna "periodo" con el formato "YYYY_T"
-# Unir los cuadros en una misma estructura con la columna TRIMESTRE y ANO4
-evolucion_c1.1 <- c.1.1_estado_final %>%
-  mutate(periodo = paste(ANO4, TRIMESTRE, sep = "")) %>%
-  pivot_longer(cols = starts_with("Poblacion_"), names_to = "Sexo", values_to = "Poblacion")
 
-evolucion_c1.2 <- c.1.2_cat_ocup_final %>%
-  mutate(periodo = paste(ANO4, TRIMESTRE, sep = "")) %>%
-  pivot_longer(cols = starts_with("Poblacion_"), names_to = "Sexo", values_to = "Poblacion")
+# Transformar los datos para que sean adecuados para ggplot
+c.1.1_grafico <- c.1.1_consolidado %>%
+  select(ESTADO, anio_trim, Prop_Varones, Prop_Mujeres) %>%
+  pivot_longer(cols = c(Prop_Varones, Prop_Mujeres), 
+               names_to = "Sexo", 
+               values_to = "Proporcion")
 
-# Gráfico de líneas para la evolución de `c.1.1`
-ggplot(evolucion_c1.1, aes(x = periodo, y = Poblacion, color = ESTADO, group = ESTADO)) +
-  geom_line() +
-  geom_point() +
-  facet_wrap(~Sexo, scales = "free_y") +
-  labs(title = "Evolución de la población por estado", x = "Trimestre", y = "Población") +
-  theme_minimal()
-
-# Gráfico de líneas para la evolución de `c.1.2`
-ggplot(evolucion_c1.2, aes(x = periodo, y = Poblacion, color = CAT_OCUP, group = CAT_OCUP)) +
-  geom_line() +
-  geom_point() +
-  facet_wrap(~Sexo, scales = "free_y") +
-  labs(title = "Evolución de la población por categoría ocupacional", x = "Trimestre", y = "Población") +
-  theme_minimal()
+# Gráfico
+ggplot(c.1.1_grafico, aes(x = anio_trim, y = Proporcion, fill = Sexo)) +
+  geom_bar(stat = "identity", position = "dodge") +  # Barras agrupadas
+  facet_wrap(~ESTADO) +  # Un gráfico por cada ESTADO
+  labs(title = "Proporción de Varones y Mujeres por Estado y Trimestre",
+       x = "Trimestre",
+       y = "Proporción",
+       fill = "Sexo") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
 
-generar_grafico_evolucion <- function(df, variable_agrupadora, titulo) {
-  df %>%
-    mutate(periodo = as.character(anio_trim)) %>%  # Usar el nombre correcto de la columna
-    pivot_longer(cols = starts_with("Poblacion_"), names_to = "Sexo", values_to = "Poblacion") %>%
-    ggplot(aes(x = periodo, y = Poblacion, color = !!sym(variable_agrupadora), group = !!sym(variable_agrupadora))) +
-    geom_line() +
-    geom_point() +
-    facet_wrap(~Sexo, scales = "free_y") +
-    labs(title = titulo, x = "Trimestre", y = "Población") +
-    theme_minimal() +
-    theme(axis.text.x = element_text(angle = 45, hjust = 1))
-}
+# Transformar los datos para que sean adecuados para ggplot
+c.1.2_grafico <- c.1.2_consolidado %>%
+  select(CAT_OCUP, anio_trim, Prop_Varones, Prop_Mujeres) %>%
+  pivot_longer(cols = c(Prop_Varones, Prop_Mujeres), 
+               names_to = "Sexo", 
+               values_to = "Proporcion")
 
-# Prueba la función con el dataset corregido
-generar_grafico_evolucion(c.1.1_estado_final, "ESTADO", "Evolución de la población por estado")
-
+# Gráfico
+ggplot(c.1.2_grafico, aes(x = anio_trim, y = Proporcion, fill = Sexo)) +
+  geom_bar(stat = "identity", position = "dodge") +  # Barras agrupadas
+  facet_wrap(~CAT_OCUP) +  # Un gráfico por cada categoría ocupacional
+  labs(title = "Proporción de Varones y Mujeres por Categoría Ocupacional y Trimestre",
+       x = "Trimestre",
+       y = "Proporción",
+       fill = "Sexo") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))

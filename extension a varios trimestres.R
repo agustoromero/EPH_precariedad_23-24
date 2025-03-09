@@ -333,6 +333,32 @@ c.1.1_consolidado <- bind_rows(c.1.1_resultados)
 c.1.2_consolidado <- bind_rows(c.1.2_resultados)
 c.3_consolidado <- bind_rows(c.3_resultados)
 
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+
+# Agregar proporciones al consolidado c.1.1
+# Convertir a numérico antes de calcular proporciones
+c.1.1_consolidado <- c.1.1_consolidado %>%
+  mutate(
+    Poblacion_Ambos = as.numeric(Poblacion_Ambos),
+    Poblacion_Varones = as.numeric(Poblacion_Varones),
+    Poblacion_Mujeres = as.numeric(Poblacion_Mujeres),
+    Prop_Varones = Poblacion_Varones / Poblacion_Ambos,
+    Prop_Mujeres = Poblacion_Mujeres / Poblacion_Ambos
+  ) %>%
+  replace_na(list(Prop_Varones = 0, Prop_Mujeres = 0))  # Evitar NaN
+# Agregar proporciones al consolidado c.1.2
+c.1.2_consolidado <- c.1.2_consolidado %>%
+  mutate(
+    Poblacion_Ambos = as.numeric(Poblacion_Ambos),
+    Poblacion_Varones = as.numeric(Poblacion_Varones),
+    Poblacion_Mujeres = as.numeric(Poblacion_Mujeres),
+    Prop_Varones = Poblacion_Varones / Poblacion_Ambos,
+    Prop_Mujeres = Poblacion_Mujeres / Poblacion_Ambos
+  ) %>%
+  replace_na(list(Prop_Varones = 0, Prop_Mujeres = 0))  # Evitar NaN
+
 # Ver los resultados #Probaria otra forma de ver (ver )
 str(c.1.1_consolidado)
 str(c.1.2_consolidado)
