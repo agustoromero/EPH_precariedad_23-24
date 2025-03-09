@@ -17,20 +17,22 @@
     filter(!(ANO4 == 2023 & TRIMESTRE < 3),  # Excluir antes del 3T 2023
            !(ANO4 == 2024 & TRIMESTRE > 2))  # Excluir después del 2T 2024
   
-  # Función para descargar y guardar datos en RDS
-  descargar_datos <- function(ano, trimestre) {
-    archivo <- paste0(ruta_datos, "base_", ano, "_T", trimestre, ".rds")
-    
-    if (!file.exists(archivo)) {  # Descargar solo si el archivo no existe
-      datos <- get_microdata(year = ano, period = trimestre, type = "individual")
-      saveRDS(datos, file = archivo)
-      message("Descargado y guardado: ", archivo)
-    } else {
-      message("Ya existe: ", archivo)
-    }
-  }
+  # Función para descargar y guardar datos en RDS #### 
+# Tiltie esta parte para no repetir con las lineas 40--52
+    # descargar_datos <- function(ano, trimestre) {
+  #   archivo <- paste0(ruta_datos, "base_", ano, "_T", trimestre, ".rds")
+  #   
+  #   if (!file.exists(archivo)) {  # Descargar solo si el archivo no existe
+  #     datos <- get_microdata(year = ano, period = trimestre, type = "individual")
+  #     saveRDS(datos, file = archivo)
+  #     message("Descargado y guardado: ", archivo)
+  #   } else {
+  #     message("Ya existe: ", archivo)
+  #   }
+  # }
+  # 
   
-  # Descargar los archivos necesarios
+  # Descargar los archivos necesarios####
   mapply(descargar_datos, 
          trimestres_seleccionados$ANO4, 
          trimestres_seleccionados$TRIMESTRE)
@@ -56,12 +58,8 @@
                    trimestres_seleccionados$TRIMESTRE[i])
   })
   
-  # Unir todas las bases en una sola
+  # Unir todas las bases en una sola ####
   datos_completos <- bind_rows(lista_datos)
-  
-  # Vista de los datos importados
-  head(datos_completos)
-  
   # Organizar etiquetas y clasificaciones
   datos_completos <- datos_completos %>%
     organize_labels(type = "individual") %>%
@@ -71,28 +69,15 @@
   # Guardar base consolidada
   saveRDS(datos_completos, "01_data/input_original/bases_originales.rds")
   
-
-# Unir todas las bases en una sola
-datos_completos <- bind_rows(lista_datos)
-
 # Vista de los datos importados
 head(datos_completos)
-
-# Organizar etiquetas y clasificaciones
-datos_completos <- datos_completos %>%
-  organize_labels(type = "individual") %>%
-  organize_caes() %>%   # Etiquetas según CAES
-  organize_cno()        # Clasificación según CNO
 
 # Guardar base consolidada
 saveRDS(datos_completos, "01_data/input_original/bases_originales.rds")
 
-
-
-###########################################################################3
-
-
-# Cargar base original
+##########################################################################3
+# Comienza el juego de las bases #### 
+# Cargar bases originales - ex datos_completos
 base <- readRDS("01_data/input_original/bases_originales.rds")
 
 # Crear variables rango_etario y nivel.ed1
@@ -119,14 +104,14 @@ base <- base %>%
     ), levels = c("Menor a Secundaria","Secundaria Completa","Superior Incompleto","Superior Completo"))
   )
 
-# Guardar base con variables personales
+# Guardar base con variables personales 
 saveRDS(base, "01_data/outputs_filtros/bases_personas.rds")
-
+#¿otra base mas? ya esta guardada como bases_originales y cómo datos completos. Me quedaría con una sola.
 ###################################################################################################
 
-# Cargar base
-base <- readRDS("01_data/outputs_filtros/bases_personas.rds")
-
+# # Cargar base
+# base <- readRDS("01_data/outputs_filtros/bases_personas.rds")
+# 
 # Filtrar ocupados
 base_ocupados <- base %>%
   filter(ESTADO == 1)
@@ -139,9 +124,9 @@ saveRDS(base_ocupados, "01_data/outputs_filtros/bases_ocupados.rds")
 # Cargar base de ocupados
 base_ocupados <- readRDS("01_data/outputs_filtros/bases_ocupados.rds")
 
-# Filtrar asalariados
-base_asalariados <- base_ocupados %>%
-  filter(CAT_OCUP == 3) %>%
+# Transformaciones a ocupados (Ex "filtrar asalariados" cambie una cositas porque son variables de ocupados) 
+base_ocupados <- base_ocupados %>%
+  filter(ESTADO== 1) %>%
   mutate(
     tamanio.establec.nueva = case_when(
       !is.na(PP04C99) ~ case_when(
@@ -167,16 +152,18 @@ base_asalariados <- base_ocupados %>%
                  "más de 6 a 12 meses", "más de 1 año a 5 años", "más de 5 años")
     )
   )
-
+base_asalariados <- base_ocupados %>% filter(CAT_OCUP==3)
 # Guardar base asalariados
-saveRDS(base_asalariados, "01_data/outputs_filtros/bases_asalariados.rds")
-
+saveRDS(base_ocupados, "01_data/outputs_filtros/bases_asalariados.rds")
+#De nuevo, quizás no tiene sentido guardar una nueva base.####
 ###################################################################################################
 
 # Cargar base de asalariados
 base_asalariados <- readRDS("01_data/outputs_filtros/bases_asalariados.rds")
 
-# Crear variables de precariedad
+# Crear variables de precariedad ####
+#Acá hay variables para los asalariados que se pueden aplicar para todos (ver )
+#las variables de nivel.ed y tamano ya estan creadas (ver )
 base_asalariados <- base_asalariados %>%
   mutate(
     # Signo de precariedad tecnológica y de calificación
@@ -215,11 +202,9 @@ base_asalariados <- base_asalariados %>%
   )
 
 # Guardar base con precariedad
+#acá tiene otro sentido guardarla porque tenes cargadas las variables de precariedad, igual se me hacen muchas bases.
 saveRDS(base_asalariados, "01_data/outputs_filtros/bases_precariedad.rds")
 
-
-
-####################################################################################
 ##########################################################################################
 
 #APLICAMOS ANALISIS A CADA TRIMESTRE Y UNIMOS
@@ -348,7 +333,7 @@ c.1.1_consolidado <- bind_rows(c.1.1_resultados)
 c.1.2_consolidado <- bind_rows(c.1.2_resultados)
 c.3_consolidado <- bind_rows(c.3_resultados)
 
-# Ver los resultados
+# Ver los resultados #Probaria otra forma de ver (ver )
 str(c.1.1_consolidado)
 str(c.1.2_consolidado)
 str(c.3_consolidado)
@@ -356,8 +341,6 @@ str(c.3_consolidado)
 ################################################################################
 
 #Extension a scripts 04 05 06
-
-
 #script 04
 
 calcular_niveled_tamanio_sexo <- function(df) {
@@ -406,7 +389,7 @@ c.4_niveled_tamanio_sexo_resultados <- lapply(base_asalariados_trimestres, calcu
 # Consolidar los resultados
 c.4_niveled_tamanio_sexo_consolidado <- bind_rows(c.4_niveled_tamanio_sexo_resultados)
 
-# Mostrar resultado consolidado
+# Mostrar resultado consolidado (Ver) # otra forma de verlo?
 print(c.4_niveled_tamanio_sexo_consolidado)
 
 ########################################################################################
@@ -590,7 +573,7 @@ calcular_rama_condicion_registro_trimestral <- function(df) {
 # Aplicar la función
 c.7.2_rama_condicion_registro_final <- calcular_rama_condicion_registro_trimestral(base)
 
-# Mostrar resultado
+# Mostrar resultado # (Ver)
 print(c.7.2_rama_condicion_registro_final)
 
 #############################################################################
@@ -652,62 +635,58 @@ print(c.8_signos_preca_final)
 #############################################################################
 
 #script 09
+#script 91
 
+tabla_preca_SS_sexo_trimestral <- calculate_tabulates(
+  base = base_asalariados,
+  x = c("TRIMESTRE", "CH04"),  # Sexo por trimestre (Ver : no anda)
+  y = "signo_sindescuento",
+  weights = "PONDERA"
+)
+print(tabla_preca_SS_sexo_trimestral)
 
-#############################################################################
+# Análisis por nivel educativo (ambos sexos)
+tabla_preca_SS_educ_trimestral <- calculate_tabulates(
+  base = base_asalariados,
+  x = c("TRIMESTRE", "NIVEL_ED"),
+  y = "signo_sindescuento",
+  weights = "PONDERA"
+) %>%
+  mutate(sexo = "Ambos")
+print(tabla_preca_SS_educ_trimestral)
 
-# #script 91
-# 
-# tabla_preca_SS_sexo_trimestral <- calculate_tabulates(
-#   base = base_asalariados,
-#   x = c("TRIMESTRE", "CH04"),  # Sexo por trimestre
-#   y = "signo_sindescuento",
-#   weights = "PONDERA"
-# )
-# print(tabla_preca_SS_sexo_trimestral)
-# 
-# # Análisis por nivel educativo (ambos sexos)
-# tabla_preca_SS_educ_trimestral <- calculate_tabulates(
-#   base = base_asalariados,
-#   x = c("TRIMESTRE", "NIVEL_ED"),
-#   y = "signo_sindescuento",
-#   weights = "PONDERA"
-# ) %>%
-#   mutate(sexo = "Ambos")
-# print(tabla_preca_SS_educ_trimestral)
-# 
-# tabla_precaSS_educ_varon_trimestral <- base_asalariados %>% 
-#   filter(CH04 == "1") %>%  # Solo varones
-#   calculate_tabulates(
-#     x = c("TRIMESTRE", "NIVEL_ED"),
-#     y = "signo_sindescuento",
-#     weights = "PONDERA"
-#   ) %>% 
-#   mutate(sexo = "Varón")
-# print(tabla_precaSS_educ_varon_trimestral)
-# 
-# tabla_precaSS_educ_mujer_trimestral <- base_asalariados %>% 
-#   filter(CH04 == "2") %>%  # Solo mujeres
-#   calculate_tabulates(
-#     x = c("TRIMESTRE", "NIVEL_ED"),
-#     y = "signo_sindescuento",
-#     weights = "PONDERA"
-#   ) %>% 
-#   mutate(sexo = "Mujer")
-# print(tabla_precaSS_educ_mujer_trimestral)
-# 
-# # Consolidar las tablas
-# c.91_precaSS_educ_sexo_final <- bind_rows(
-#   tabla_preca_SS_educ_trimestral, 
-#   tabla_precaSS_educ_varon_trimestral, 
-#   tabla_precaSS_educ_mujer_trimestral
-# )
-# 
-# # Limpiar variables innecesarias
-# objetos <- c("tabla_precaSS_educ_varon_trimestral", "tabla_precaSS_educ_mujer_trimestral", 
-#              "tabla_preca_SS_sexo_trimestral", "tabla_preca_SS_educ_trimestral")
-# rm(list = intersect(objetos, ls()))
-# 
-# # Ver resultado final
-# print(c.91_precaSS_educ_sexo_final)
-# 
+tabla_precaSS_educ_varon_trimestral <- base_asalariados %>%
+  filter(CH04 == "1") %>%  # Solo varones
+  calculate_tabulates(
+    x = c("TRIMESTRE", "NIVEL_ED"),
+    y = "signo_sindescuento",
+    weights = "PONDERA"
+  ) %>%
+  mutate(sexo = "Varón")
+print(tabla_precaSS_educ_varon_trimestral)
+
+tabla_precaSS_educ_mujer_trimestral <- base_asalariados %>%
+  filter(CH04 == "2") %>%  # Solo mujeres
+  calculate_tabulates(
+    x = c("TRIMESTRE", "NIVEL_ED"),
+    y = "signo_sindescuento",
+    weights = "PONDERA"
+  ) %>%
+  mutate(sexo = "Mujer")
+print(tabla_precaSS_educ_mujer_trimestral)
+
+# Consolidar las tablas
+c.91_precaSS_educ_sexo_final <- bind_rows(
+  tabla_preca_SS_educ_trimestral,
+  tabla_precaSS_educ_varon_trimestral,
+  tabla_precaSS_educ_mujer_trimestral
+)
+
+# Limpiar variables innecesarias
+objetos <- c("tabla_precaSS_educ_varon_trimestral", "tabla_precaSS_educ_mujer_trimestral",
+             "tabla_preca_SS_sexo_trimestral", "tabla_preca_SS_educ_trimestral")
+rm(list = intersect(objetos, ls()))
+
+# Ver resultado final
+print(c.91_precaSS_educ_sexo_final)
+
