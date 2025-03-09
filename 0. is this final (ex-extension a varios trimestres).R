@@ -32,44 +32,21 @@
   ) %>%
     filter(!(ANO4 == 2023 & TRIMESTRE < 3),  # Excluir antes del 3T 2023
            !(ANO4 == 2024 & TRIMESTRE > 2))  # Excluir después del 2T 2024
- 
-  {
-# Función para descargar y guardar datos en RDS
-# Tiltie esta parte para no repetir con las lineas 40--52
-    # descargar_datos <- function(ano, trimestre) {
-  #   archivo <- paste0(ruta_datos, "base_", ano, "_T", trimestre, ".rds")
-  #   
-  #   if (!file.exists(archivo)) {  # Descargar solo si el archivo no existe
-  #     datos <- get_microdata(year = ano, period = trimestre, type = "individual")
-  #     saveRDS(datos, file = archivo)
-  #     message("Descargado y guardado: ", archivo)
-  #   } else {
-  #     message("Ya existe: ", archivo)
-  #   }
-  # }
-  # # Descargar los archivos necesarios
-  # mapply(descargar_datos, 
-  #        trimestres_seleccionados$ANO4, 
-  #        trimestres_seleccionados$TRIMESTRE) 
-    } #tiltié porque se repite (BORRAR) 
- 
-  
-  # Importar y combinar todos los archivos
+   # Importar y combinar todos los archivos
   lista_datos <- lapply(1:nrow(trimestres_seleccionados), function(i) {
     importar_datos(trimestres_seleccionados$ANO4[i], 
                    trimestres_seleccionados$TRIMESTRE[i])
   })
 
- {
-  # Modificación de todo: termina en base_ocupados
-  # Unir todas las bases en una sola 
-  datos_completos <- bind_rows(lista_datos)
-  # Organizar etiquetas y clasificaciones
-  datos_completos <- datos_completos %>%
-    organize_labels(type = "individual") %>%
-    organize_caes() %>%   # Etiquetas según CAES
-    organize_cno()        # Clasificación según CNO
-    # Vista de los datos importados
+ {  # Unir todas las bases en una sola ####
+   datos_completos <- bind_rows(lista_datos)
+   # Organizar etiquetas y clasificaciones
+   datos_completos <- datos_completos %>%
+     organize_labels(type = "individual") 
+   datos_completos <- datos_completos %>%
+     organize_caes() %>%   # Etiquetas según CAES
+     organize_cno()        # Clasificación según CNO
+   # Vista de los datos importados
     head(datos_completos)
   # Guardar base consolidada
 saveRDS(datos_completos, "01_data/input_original/bases_originales.rds")
@@ -135,12 +112,6 @@ base_ocupados <- base_ocupados %>%
                  "más de 6 a 12 meses", "más de 1 año a 5 años", "más de 5 años")
     )
   )
-      {#base_asalariados <- base_ocupados %>% filter(CAT_OCUP==3)
-# Guardar base asalariados
-#saveRDS(base_ocupados, "01_data/outputs_filtros/bases_asalariados.rds")
-#saveRDS(base_asalariados, "01_data/outputs_filtros/bases_asalariados.rds")
-
-}# (BORRAR) De nuevo, quizás no tiene sentido guardar una nueva base.Armaría todo este capitulo con una sola base
 
 }#BASE OCUPADOS #Modificaciones a la base
   
@@ -148,7 +119,7 @@ base_ocupados <- base_ocupados %>%
 {#(ver : sugerencia de modificar trtamiento pa ocupados vs asalariados) 
 #Acá hay variables para los asalariados que se pueden aplicar para todos (ver )
 #las variables de nivel.ed y tamano ya estan creadas (ver )
-base_asalariados <- base_ocupados %>% filter(CAT_OCUP==3)
+base_asalariados <- base_ocupados %>% filter(ESTADO==1 & CAT_OCUP==3)
 base_asalariados <- base_asalariados %>%
   mutate(
     # Signo de precariedad tecnológica y de calificación
@@ -163,27 +134,33 @@ base_asalariados <- base_asalariados %>%
       NIVEL_ED == 6 ~ "Superior Completo",
       TRUE ~ "Ns/Nr"
     ), levels = c("Menor a Secundaria","Secundaria Completa","Superior Incompleto","Superior Completo"))
-  )    
+  ,    
     # Clasificación de tamaño del establecimiento
-    tamanio.establec = factor(case_when(
-      PP04C %in% 1:6  ~ "Pequeño",
-      PP04C %in% 7:8  ~ "Mediano",
-      PP04C %in% 9:12 ~ "Grande",
-      PP04C %in% 99   ~ "Ns/Nr"
-    ), levels = c("Pequeño","Mediano","Grande","Ns/Nr")),
-    
-    descuento_jubil = case_when(PP07H == 1 ~ "Si", PP07H == 2 ~ "No"),
-    part.time.inv = case_when(PP3E_TOT < 35 & PP03G == 1 ~ "Si", TRUE ~ "No"),
-    tiempo.determinado = case_when(PP07C == 1 ~ "Si", TRUE ~ "No"),
-    signo_educ_tamaño = as.integer(nivel.ed == "Menor a Secundaria" & tamanio.establec == "Pequeño"),  # 1er signo
-    signo_sindescuento = as.integer(descuento_jubil == "No"),  # 2do signo
-    signo_tiempo = as.integer(part.time.inv == "Si" & tiempo.determinado == "No"),  # 3er signo
-    signo_tecno_calif = as.integer(preca_tecno_calif == 4),  # 4to signo
-    total_4_signos = signo_educ_tamaño + signo_sindescuento + signo_tiempo + signo_tecno_calif,
-    almenos1de4 = as.integer(total_4_signos >= 1),
-    almenos1de3 = as.integer(signo_educ_tamaño + signo_sindescuento + signo_tiempo >= 1),
-    sin_preca_de3 = as.integer(signo_educ_tamaño + signo_sindescuento + signo_tiempo == 0),
-    sin_preca_de4 = as.integer(total_4_signos == 0)
+    tamanio.establec = case_when(
+      !is.na(PP04C99) ~ case_when(
+        PP04C99 == 1 ~ "peque",
+        PP04C99 == 2 ~ "mediano",
+        PP04C99 == 3 ~ "grande",
+        PP04C99 == 9 ~ "NS/NR"
+      ),
+      PP04C == 1 ~ "uni",
+      PP04C %in% c(2, 3, 4, 5) ~ "peque",
+      PP04C %in% c(6, 7, 8) ~ "mediano",
+      PP04C %in% c(9, 10, 11, 12) ~ "grande",
+      TRUE ~ NA_character_
+    ),
+    descuento_jubil     = case_when(PP07H == 1 ~ "Si", PP07H == 2 ~ "No"),
+    part.time.inv       = case_when(PP3E_TOT < 35 & PP03G == 1 ~ "Si", TRUE ~ "No"),
+    tiempo.determinado  = case_when(PP07C == 1 ~ "Si", TRUE ~ "No"),
+    signo_educ_tamaño   = as.integer(nivel.ed == "Menor a Secundaria" & tamanio.establec == "Pequeño"),  # 1er signo
+    signo_sindescuento  = as.integer(descuento_jubil == "No"),  # 2do signo
+    signo_tiempo        = as.integer(part.time.inv == "Si" & tiempo.determinado == "No"),  # 3er signo
+    signo_tecno_calif   = as.integer(preca_tecno_calif == 4),  # 4to signo
+    total_4_signos      = signo_educ_tamaño + signo_sindescuento + signo_tiempo + signo_tecno_calif,
+    almenos1de4         = as.integer(total_4_signos >= 1),
+    almenos1de3         = as.integer(signo_educ_tamaño + signo_sindescuento + signo_tiempo >= 1),
+    sin_preca_de3       = as.integer(signo_educ_tamaño + signo_sindescuento + signo_tiempo == 0),
+    sin_preca_de4       = as.integer(total_4_signos == 0)
   )
 
 # Guardar base con precariedad # (ver : podria ser la misma base de asalariados.)
@@ -365,14 +342,14 @@ calcular_niveled_tamanio_sexo <- function(df) {
   return(cuadro_final)
 }
 
-# Aplicar la función a cada trimestre
-c.4_niveled_tamanio_sexo_resultados <- lapply(base_asalariados_trimestres, calcular_niveled_tamanio_sexo)
+# Aplicar la función a cada trimestre (ERROR)
+#c.4_niveled_tamanio_sexo_resultados <- lapply(base_asalariados_trimestres, calcular_niveled_tamanio_sexo)
 
 # Consolidar los resultados
-c.4_niveled_tamanio_sexo_consolidado <- bind_rows(c.4_niveled_tamanio_sexo_resultados)
+#c.4_niveled_tamanio_sexo_consolidado <- bind_rows(c.4_niveled_tamanio_sexo_resultados)
 
 # Mostrar resultado consolidado (Ver) # otra forma de verlo?
-print(c.4_niveled_tamanio_sexo_consolidado)
+#print(c.4_niveled_tamanio_sexo_consolidado)
 
 #sript 05
 
@@ -594,13 +571,13 @@ cuadro_precariedad_sexo_trimestral <- function(df) {
   return(indicadores)
 }
 
-# Llamar ambas funciones
-cuadro_general <- cuadro_precariedad_ambos_trimestral(base_asalariados)
-cuadro_sexo <- cuadro_precariedad_sexo_trimestral(base_asalariados)
+# Llamar ambas funciones (ERROR)
+#cuadro_general <- cuadro_precariedad_ambos_trimestral(base_asalariados)
+#cuadro_sexo <- cuadro_precariedad_sexo_trimestral(base_asalariados)
 
 # Combinar los resultados
-c.8_signos_preca_final <- bind_rows(cuadro_general, cuadro_sexo)
-rm(cuadro_general, cuadro_sexo)
+#c.8_signos_preca_final <- bind_rows(cuadro_general, cuadro_sexo)
+#rm(cuadro_general, cuadro_sexo)
 
 # Ver el resultado
 print(c.8_signos_preca_final)
