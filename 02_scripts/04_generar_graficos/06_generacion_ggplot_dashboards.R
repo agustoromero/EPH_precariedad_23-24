@@ -51,6 +51,7 @@ ggplot(c.1.2_grafico, aes(x = anio_trim, y = Proporcion, fill = Sexo)) +
   scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +  # Formato porcentaje
   theme_minimal() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
+<<<<<<< HEAD
 
 
 
@@ -91,3 +92,5 @@ p <- ggplot(c.91_grafico, aes(x = as.factor(anio_trim), y = Valor, fill = sexo))
 # Convertir a gráfico interactivo con plotly
 ggplotly(p)
 
+=======
+>>>>>>> cecd632063978dd9df38197b645dd8fcfe27750e

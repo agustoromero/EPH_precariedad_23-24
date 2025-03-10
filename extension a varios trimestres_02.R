@@ -520,12 +520,24 @@ calcular_rama_condicion_registro_trimestral <- function(df) {
   return(cuadro_final)
 }
 
+# calcular_salario_no_reg <- function(df) {
+#   df %>%
+#     filter(ESTADO == 1, CAT_OCUP == 3) %>%
+#     group_by(ANO4, TRIMESTRE) %>%
+#     summarise(
+#       tasa_no_reg = sum(PONDERA[PP07H == 2]) / sum(PONDERA),
+#       salario_prom = weighted.mean(P21, PONDIIO, na.rm = TRUE),
+#       asalariados = sum(PONDERA)
+#     )
+# }
 # Aplicar la función
 c.7.2_rama_condicion_registro_final <- calcular_rama_condicion_registro_trimestral(base)
 
 # Mostrar resultado # (Ver)
 print(c.7.2_rama_condicion_registro_final)
 
+#Salario prom y prop de precario
+# c.7.3_salario_promyno_reg <- calcular_salario_no_reg(base)
 #script 08
 
 cuadro_precariedad_ambos_trimestral <- function(df) {
@@ -576,6 +588,7 @@ cuadro_sexo <- cuadro_precariedad_sexo_trimestral(base_asalariados)
 c.8_signos_preca_final <- bind_rows(cuadro_general, cuadro_sexo)
 rm(cuadro_general, cuadro_sexo)
 
+
 # Ver el resultado
 print(c.8_signos_preca_final)
 
@@ -587,7 +600,20 @@ print(c.8_signos_preca_final)
 # Tabla de precarización por sexo y trimestre (Corrección en `x`)
 tabla_preca_SS_sexo_trimestral <- calculate_tabulates(
   base = base_asalariados,
+<<<<<<< HEAD
   x = "anio_trim",  # Solo una variable en `x`
+=======
+  x = c("anio_trim", "CH04"),  # Sexo por trimestre (Ver : no anda)
+  y = "signo_sindescuento",
+  weights = "PONDERA"
+)
+print(tabla_preca_SS_sexo_trimestral)
+
+# Análisis por nivel educativo (ambos sexos)
+tabla_preca_SS_educ_trimestral <- calculate_tabulates(
+  base = base_asalariados,
+  x = c("anio_trim", "nivel.ed1"),
+>>>>>>> cecd632063978dd9df38197b645dd8fcfe27750e
   y = "signo_sindescuento",
   weights = "PONDERA"
 ) %>%
@@ -610,7 +636,11 @@ print(tabla_preca_SS_educ_trimestral)
 tabla_precaSS_educ_varon_trimestral <- base_asalariados %>%
   filter(CH04 == 1) %>%  # Sin comillas si CH04 es numérico
   calculate_tabulates(
+<<<<<<< HEAD
     x = "nivel.ed1",
+=======
+    x = c("anio_trim", "nivel.ed1"),
+>>>>>>> cecd632063978dd9df38197b645dd8fcfe27750e
     y = "signo_sindescuento",
     weights = "PONDERA"
   ) %>%
@@ -622,7 +652,11 @@ print(tabla_precaSS_educ_varon_trimestral)
 tabla_precaSS_educ_mujer_trimestral <- base_asalariados %>%
   filter(CH04 == 2) %>%  # Sin comillas si CH04 es numérico
   calculate_tabulates(
+<<<<<<< HEAD
     x = "nivel.ed1",
+=======
+    x = c("anio_trim", "nivel.ed1"),
+>>>>>>> cecd632063978dd9df38197b645dd8fcfe27750e
     y = "signo_sindescuento",
     weights = "PONDERA"
   ) %>%
@@ -641,6 +675,7 @@ c.91_precaSS_educ_sexo_final <- bind_rows(
 objetos <- c("tabla_precaSS_educ_varon_trimestral", "tabla_precaSS_educ_mujer_trimestral",
              "tabla_preca_SS_sexo_trimestral", "tabla_preca_SS_educ_trimestral")
 rm(list = intersect(objetos, ls()))
+c.91_precaSS_educ_sexo_final <- c.91_precaSS_educ_sexo_final %>% select(-total)
 
 # Eliminar columna `total` si existe
 if ("total" %in% names(c.91_precaSS_educ_sexo_final)) {
@@ -649,3 +684,27 @@ if ("total" %in% names(c.91_precaSS_educ_sexo_final)) {
 
 # Ver resultado final
 print(c.91_precaSS_educ_sexo_final)
+<<<<<<< HEAD
+=======
+
+# calculate_tabulates <- function(base, x, y, weights) {
+#   # Validar que `x`, `y` y `weights` existan en la base
+#   if (!all(x %in% names(base))) stop("Algunas variables de 'x' no están en la base de datos.")
+#   if (!(y %in% names(base))) stop("La variable 'y' no está en la base de datos.")
+#   if (!(weights %in% names(base))) stop("La variable de ponderación no está en la base de datos.")
+#   
+#   base %>%
+#     group_by(across(all_of(x))) %>%  
+#     summarise(
+#       total = sum(!!sym(weights), na.rm = TRUE),
+#       conteo = sum(!!sym(weights) * as.numeric(!!sym(y) > 0), na.rm = TRUE),  # Asegurar binarización
+#       proporcion = conteo / total * 100,
+#       .groups = "drop"
+#     )
+# }
+
+# 
+# total = 50000 significa que los varones del trimestre 2024T1 representan 50,000 personas en la población.
+# conteo = 10000 significa que 10,000 de esas personas tienen y > 0.
+# proporcion = 20% significa que el 20% de los varones en 2024T1 tienen y > 0.
+>>>>>>> cecd632063978dd9df38197b645dd8fcfe27750e
