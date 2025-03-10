@@ -584,42 +584,50 @@ print(c.8_signos_preca_final)
 #script 09
 #script 91
 
+# Tabla de precarización por sexo y trimestre (Corrección en `x`)
 tabla_preca_SS_sexo_trimestral <- calculate_tabulates(
   base = base_asalariados,
-  x = c("TRIMESTRE", "CH04"),  # Sexo por trimestre (Ver : no anda)
-  y = "signo_sindescuento",
-  weights = "PONDERA"
-)
-print(tabla_preca_SS_sexo_trimestral)
-
-# Análisis por nivel educativo (ambos sexos)
-tabla_preca_SS_educ_trimestral <- calculate_tabulates(
-  base = base_asalariados,
-  x = c("TRIMESTRE", "NIVEL_ED"),
+  x = "anio_trim",  # Solo una variable en `x`
   y = "signo_sindescuento",
   weights = "PONDERA"
 ) %>%
-  mutate(sexo = "Ambos")
+  mutate(sexo = "Ambos")  # Se agrega etiqueta general
+
+print(tabla_preca_SS_sexo_trimestral)
+
+# Tabla de precarización por nivel educativo (ambos sexos)
+tabla_preca_SS_educ_trimestral <- calculate_tabulates(
+  base = base_asalariados,
+  x = "nivel.ed1",  # Solo una variable en `x`
+  y = "signo_sindescuento",
+  weights = "PONDERA"
+) %>%
+  mutate(sexo = "Ambos")  
+
 print(tabla_preca_SS_educ_trimestral)
 
+# Filtrar base y calcular para varones
 tabla_precaSS_educ_varon_trimestral <- base_asalariados %>%
-  filter(CH04 == "1") %>%  # Solo varones
+  filter(CH04 == 1) %>%  # Sin comillas si CH04 es numérico
   calculate_tabulates(
-    x = c("TRIMESTRE", "NIVEL_ED"),
+    x = "nivel.ed1",
     y = "signo_sindescuento",
     weights = "PONDERA"
   ) %>%
   mutate(sexo = "Varón")
+
 print(tabla_precaSS_educ_varon_trimestral)
 
+# Filtrar base y calcular para mujeres
 tabla_precaSS_educ_mujer_trimestral <- base_asalariados %>%
-  filter(CH04 == "2") %>%  # Solo mujeres
+  filter(CH04 == 2) %>%  # Sin comillas si CH04 es numérico
   calculate_tabulates(
-    x = c("TRIMESTRE", "NIVEL_ED"),
+    x = "nivel.ed1",
     y = "signo_sindescuento",
     weights = "PONDERA"
   ) %>%
   mutate(sexo = "Mujer")
+
 print(tabla_precaSS_educ_mujer_trimestral)
 
 # Consolidar las tablas
@@ -634,6 +642,10 @@ objetos <- c("tabla_precaSS_educ_varon_trimestral", "tabla_precaSS_educ_mujer_tr
              "tabla_preca_SS_sexo_trimestral", "tabla_preca_SS_educ_trimestral")
 rm(list = intersect(objetos, ls()))
 
+# Eliminar columna `total` si existe
+if ("total" %in% names(c.91_precaSS_educ_sexo_final)) {
+  c.91_precaSS_educ_sexo_final <- c.91_precaSS_educ_sexo_final %>% select(-total)
+}
+
 # Ver resultado final
 print(c.91_precaSS_educ_sexo_final)
-
