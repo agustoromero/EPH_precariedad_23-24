@@ -5,6 +5,8 @@
   library(dplyr)
   library(readr)
   library(openxlsx)
+  library(stringr)
+  library(purrr)
   
   # Ruta donde se almacenan los archivos RDS
   ruta_datos <- "01_data/"
@@ -209,27 +211,33 @@ saveRDS(base_asalariados, "01_data/outputs_filtros/bases_precariedad.rds")
 
 #APLICAMOS ANALISIS A CADA TRIMESTRE Y UNIMOS
 
-# Filtrar por Año y Trimestre con reconocimiento de texto
+# # Filtrar por Año y Trimestre con reconocimiento de texto
+# Función para filtrar por Año y Trimestre usando solo la parte numérica de TRIMESTRE
 filtrar_por_trimestre <- function(df, anio, trimestre) {
-  # Crear la columna anio.trim para el formato YYYYTn
+  # Reconstruir anio_trim extrayendo solo el dígito inicial de TRIMESTRE
   df <- df %>%
-    mutate(anio_trim = paste(ANO4, "T", TRIMESTRE, sep = ""))
+    mutate(anio_trim = paste(ANO4, "T", str_extract(TRIMESTRE, "^[0-9]+"), sep = ""))
   
-  # Filtrar el dataframe usando str_detect para los patrones "YYYYTn"
+  # Definir el valor target, por ejemplo "2023T3"
+  target <- paste(anio, "T", trimestre, sep = "")
+  message("Filtrando por target: ", target)
+  
+  # Filtrar el dataframe
   df_filtrado <- df %>%
-    filter(str_detect(anio_trim, paste(anio, "T", trimestre, sep = "")))
+    filter(anio_trim == target)
   
+  message("Filas filtradas: ", nrow(df_filtrado))
   return(df_filtrado)
 }
 
-# Funciones para cálculos
 
+# Función para cálculos: cuadro c.1.1
 calcular_poblacion_estado <- function(df) {
   # Asegurarnos de que ESTADO sea un factor
   df$ESTADO <- as.factor(df$ESTADO)
   
   c.1.1_estado_sexo <- df %>%
-    group_by(ESTADO, anio_trim) %>%
+    group_by(ESTADO, anio_trim) %>%  # Utilizamos anio_trim ya corregido
     summarise(
       Poblacion_Ambos = sum(PONDERA, na.rm = TRUE),
       Poblacion_Varones = sum(PONDERA[CH04 == 1], na.rm = TRUE),
@@ -244,17 +252,48 @@ calcular_poblacion_estado <- function(df) {
   return(c.1.1_estado_sexo)
 }
 
+# Definir los trimestres de interés usando el formato "YYYYTn" deseado
+trimestres <- list(
+  "2023_3" = filtrar_por_trimestre(base, "2023", 3),
+  "2023_4" = filtrar_por_trimestre(base, "2023", 4),
+  "2024_1" = filtrar_por_trimestre(base, "2024", 1),
+  "2024_2" = filtrar_por_trimestre(base, "2024", 2)
+)
+
+# Aplicar la función a cada trimestre y consolidar los resultados
+c.1.1_resultados <- lapply(trimestres, calcular_poblacion_estado)
+
+# Unir los resultados por trimestre
+c.1.1_consolidado <- bind_rows(c.1.1_resultados)
+
+# Agregar proporciones al consolidado c.1.1
+c.1.1_consolidado <- c.1.1_consolidado %>%
+  mutate(
+    Poblacion_Ambos = as.numeric(Poblacion_Ambos),
+    Poblacion_Varones = as.numeric(Poblacion_Varones),
+    Poblacion_Mujeres = as.numeric(Poblacion_Mujeres),
+    Prop_Varones = ifelse(Poblacion_Ambos > 0, Poblacion_Varones / Poblacion_Ambos, 0),
+    Prop_Mujeres = ifelse(Poblacion_Ambos > 0, Poblacion_Mujeres / Poblacion_Ambos, 0)
+  ) %>%
+  replace_na(list(Prop_Varones = 0, Prop_Mujeres = 0))  # Evitar NaN
+
+# Verificar los resultados: La columna anio_trim debe mostrar, por ejemplo, "2023T3"
+str(c.1.1_consolidado)
+
+##############
 calcular_poblacion_estado_cat_ocup <- function(df) {
   df_ocupado <- df %>%
+    # Forzamos el formato de anio_trim: extraer solo "YYYYTn"
+    mutate(anio_trim = str_extract(as.character(anio_trim), "^[0-9]{4}T[0-9]")) %>%
     filter(ESTADO == 1)
   
   df_ocupado$ESTADO <- as.factor(df_ocupado$ESTADO)
   df_ocupado$CAT_OCUP <- as.factor(df_ocupado$CAT_OCUP)
   
   c.1.2_cat_ocup <- df_ocupado %>%
-    group_by(CAT_OCUP, anio_trim) %>%
+    group_by(CAT_OCUP, anio_trim) %>%  
     summarise(
-      Poblacion_Ambos = sum(PONDERA, na.rm = TRUE),
+      Poblacion_Ambos   = sum(PONDERA, na.rm = TRUE),
       Poblacion_Varones = sum(PONDERA[CH04 == 1], na.rm = TRUE),
       Poblacion_Mujeres = sum(PONDERA[CH04 == 2], na.rm = TRUE),
       .groups = "drop"
@@ -267,25 +306,105 @@ calcular_poblacion_estado_cat_ocup <- function(df) {
   return(c.1.2_cat_ocup)
 }
 
+# Aplicar la función a cada trimestre y consolidar los resultados
+c.1.2_resultados <- lapply(trimestres, calcular_poblacion_estado_cat_ocup)
+c.1.2_consolidado <- bind_rows(c.1.2_resultados) %>%
+  mutate(
+    Poblacion_Ambos   = as.numeric(Poblacion_Ambos),
+    Poblacion_Varones = as.numeric(Poblacion_Varones),
+    Poblacion_Mujeres = as.numeric(Poblacion_Mujeres),
+    Prop_Varones      = ifelse(Poblacion_Ambos > 0, Poblacion_Varones / Poblacion_Ambos, 0),
+    Prop_Mujeres      = ifelse(Poblacion_Ambos > 0, Poblacion_Mujeres / Poblacion_Ambos, 0)
+  ) %>%
+  replace_na(list(Prop_Varones = 0, Prop_Mujeres = 0))
+
+# Verificar los resultados
+str(c.1.2_consolidado)
+
+
+######################################################################
+
+#script03           
+# 
+
 calcular_rama_tamanio_sexo <- function(df) {
-  # Ahora estamos trabajando con base_asalariados, por lo que filtramos sobre ella
   cuadro_base <- df %>%
+    # Forzamos el formato de anio_trim: extraer solo "YYYYTn"
+    mutate(anio_trim = str_extract(as.character(anio_trim), "^[0-9]{4}T[0-9]")) %>%
     filter(ESTADO == 1 & CAT_OCUP == 3) %>%
     group_by(caes_seccion_label, tamanio.establec.nueva, anio_trim) %>%
     summarise(
-      Poblacion_Ambos = sum(PONDERA, na.rm = TRUE),
+      Poblacion_Ambos   = sum(PONDERA, na.rm = TRUE),
       Poblacion_Varones = sum(PONDERA[CH04 == 1], na.rm = TRUE),
       Poblacion_Mujeres = sum(PONDERA[CH04 == 2], na.rm = TRUE),
       .groups = "drop"
     ) %>%
     mutate(
-      Prop_Ambos = Poblacion_Ambos / sum(Poblacion_Ambos, na.rm = TRUE),
+      Prop_Ambos   = Poblacion_Ambos / sum(Poblacion_Ambos, na.rm = TRUE),
+      Prop_Varones = Poblacion_Varones / Poblacion_Ambos,
+      Prop_Mujeres = Poblacion_Mujeres / Poblacion_Ambos
+    )
+
+  total_rama <- cuadro_base %>%
+    group_by(caes_seccion_label) %>%
+    summarise(
+      tamanio.establec.nueva = "Total",
+      across(where(is.numeric), sum, na.rm = TRUE),
+      .groups = "drop"
+    )
+
+  total_general <- cuadro_base %>%
+    summarise(
+      caes_seccion_label     = "Total",
+      tamanio.establec.nueva = "Total",
+      across(where(is.numeric), sum, na.rm = TRUE)
+    )
+
+  cuadro_final <- bind_rows(cuadro_base, total_rama, total_general) %>%
+    mutate(across(everything(), ~ replace(., is.na(.), "-")))
+
+  return(cuadro_final)
+}
+
+# Aplicar la función a la base_asalariados para cada trimestre
+c.3_resultados <- base_asalariados %>%
+  group_by(anio_trim) %>%
+  do(calcular_rama_tamanio_sexo(.))
+
+# Consolidar los resultados en una tabla final
+c.3_consolidado <- bind_rows(c.3_resultados)
+
+# Verificar los resultados
+str(c.3_consolidado)
+
+
+
+######################################################################
+#script 04
+
+calcular_niveled_tamanio_ocupacion <- function(df) {
+  cuadro_base <- df %>%
+    mutate(anio_trim = str_extract(as.character(anio_trim), "^[0-9]{4}T[0-9]")) %>%
+    filter(ESTADO == 1 & CAT_OCUP == 3) %>%
+    group_by(nivel.ed1, tamanio.establec.nueva, anio_trim) %>%
+    summarise(
+      Poblacion_Ambos   = sum(PONDERA, na.rm = TRUE),
+      Poblacion_Varones = sum(PONDERA[CH04 == 1], na.rm = TRUE),
+      Poblacion_Mujeres = sum(PONDERA[CH04 == 2], na.rm = TRUE),
+      .groups = "drop"
+    ) %>%
+    mutate(
+      Prop_Ambos   = Poblacion_Ambos / sum(Poblacion_Ambos, na.rm = TRUE),
       Prop_Varones = Poblacion_Varones / Poblacion_Ambos,
       Prop_Mujeres = Poblacion_Mujeres / Poblacion_Ambos
     )
   
+  # Asegurarse de que todas las columnas sean de tipo correcto
+  cuadro_base <- cuadro_base %>%
+    mutate(across(where(is.labelled), as.character)) # Convierte las columnas 'labelled' a 'character'
+  
   total_rama <- cuadro_base %>%
-    group_by(caes_seccion_label) %>%
+    group_by(nivel.ed1) %>%
     summarise(
       tamanio.establec.nueva = "Total",
       across(where(is.numeric), sum, na.rm = TRUE),
@@ -294,7 +413,7 @@ calcular_rama_tamanio_sexo <- function(df) {
   
   total_general <- cuadro_base %>%
     summarise(
-      caes_seccion_label = "Total",
+      nivel.ed1     = "Total",
       tamanio.establec.nueva = "Total",
       across(where(is.numeric), sum, na.rm = TRUE)
     )
@@ -305,416 +424,205 @@ calcular_rama_tamanio_sexo <- function(df) {
   return(cuadro_final)
 }
 
-# Filtrar y aplicar las funciones a cada trimestre
-trimestres <- list(
-  "2023_3" = filtrar_por_trimestre(base, "2023", 3),
-  "2023_4" = filtrar_por_trimestre(base, "2023", 4),
-  "2024_1" = filtrar_por_trimestre(base, "2024", 1),
-  "2024_2" = filtrar_por_trimestre(base, "2024", 2)
-)
+# Aplicar la función a la base_asalariados para cada trimestre
+c.4_resultados <- base_asalariados %>%
+  group_by(anio_trim) %>%
+  do(calcular_niveled_tamanio_ocupacion(.))
 
-# Aplicar las funciones a cada trimestre y consolidar los resultados
-c.1.1_resultados <- lapply(trimestres, calcular_poblacion_estado)
-c.1.2_resultados <- lapply(trimestres, calcular_poblacion_estado_cat_ocup)
+# Consolidar los resultados en una tabla final
+c.4_consolidado <- bind_rows(c.4_resultados)
 
-# Para calcular rama_tamanio_sexo, se trabaja sobre base_asalariados
-base_asalariados_trimestres <- list(
-  "2023_3" = filtrar_por_trimestre(base_asalariados, "2023", 3),
-  "2023_4" = filtrar_por_trimestre(base_asalariados, "2023", 4),
-  "2024_1" = filtrar_por_trimestre(base_asalariados, "2024", 1),
-  "2024_2" = filtrar_por_trimestre(base_asalariados, "2024", 2)
-)
+# Verificar los resultados
+str(c.4_consolidado)
 
-# Aplicar la función para rama_tamanio_sexo
-c.3_resultados <- lapply(base_asalariados_trimestres, calcular_rama_tamanio_sexo)
 
-# Unir los resultados por trimestre
-c.1.1_consolidado <- bind_rows(c.1.1_resultados)
-c.1.2_consolidado <- bind_rows(c.1.2_resultados)
-c.3_consolidado <- bind_rows(c.3_resultados)
-
-library(dplyr)
-library(tidyr)
-library(ggplot2)
-
-# Agregar proporciones al consolidado c.1.1
-# Convertir a numérico antes de calcular proporciones
-c.1.1_consolidado <- c.1.1_consolidado %>%
-  mutate(
-    Poblacion_Ambos = as.numeric(Poblacion_Ambos),
-    Poblacion_Varones = as.numeric(Poblacion_Varones),
-    Poblacion_Mujeres = as.numeric(Poblacion_Mujeres),
-    Prop_Varones = Poblacion_Varones / Poblacion_Ambos,
-    Prop_Mujeres = Poblacion_Mujeres / Poblacion_Ambos
-  ) %>%
-  replace_na(list(Prop_Varones = 0, Prop_Mujeres = 0))  # Evitar NaN
-# Agregar proporciones al consolidado c.1.2
-c.1.2_consolidado <- c.1.2_consolidado %>%
-  mutate(
-    Poblacion_Ambos = as.numeric(Poblacion_Ambos),
-    Poblacion_Varones = as.numeric(Poblacion_Varones),
-    Poblacion_Mujeres = as.numeric(Poblacion_Mujeres),
-    Prop_Varones = Poblacion_Varones / Poblacion_Ambos,
-    Prop_Mujeres = Poblacion_Mujeres / Poblacion_Ambos
-  ) %>%
-  replace_na(list(Prop_Varones = 0, Prop_Mujeres = 0))  # Evitar NaN
-
-# Ver los resultados #Probaria otra forma de ver (ver )
-str(c.1.1_consolidado)
-str(c.1.2_consolidado)
-str(c.3_consolidado)
-
-################################################################################
-
-#Extension a scripts 04 05 06
-#script 04
-
-calcular_niveled_tamanio_sexo <- function(df) {
-  cuadro_base <- df %>% 
-    filter(ESTADO == 1 & CAT_OCUP == 3) %>% 
-    group_by(nivel.ed, tamanio.establec.nueva, anio_trim) %>%
-    summarise(
-      Poblacion_Ambos = sum(PONDERA, na.rm = TRUE),
-      Poblacion_Varones = sum(PONDERA[CH04 == 1], na.rm = TRUE),
-      Poblacion_Mujeres = sum(PONDERA[CH04 == 2], na.rm = TRUE),
-      .groups = "drop"
-    ) %>%
-    mutate(
-      Prop_Ambos = Poblacion_Ambos / sum(Poblacion_Ambos, na.rm = TRUE),
-      Prop_Varones = Poblacion_Varones / Poblacion_Ambos,
-      Prop_Mujeres = Poblacion_Mujeres / Poblacion_Ambos
-    )
-  
-  # Calcular fila de total por nivel educativo
-  total_niveled <- cuadro_base %>%
-    group_by(nivel.ed) %>%
-    summarise(
-      tamanio.establec.nueva = "Total",
-      across(where(is.numeric), sum, na.rm = TRUE),
-      .groups = "drop"
-    )
-  
-  # Calcular fila de total general
-  total_general <- cuadro_base %>%                 #####ACA totales por TREMESTRE######
-    summarise(
-      nivel.ed = "Total",
-      tamanio.establec.nueva = "Total",
-      across(where(is.numeric), sum, na.rm = TRUE)
-    )
-  
-  # Unir resultados
-  cuadro_final <- bind_rows(cuadro_base, total_niveled, total_general) %>%
-    mutate(across(everything(), ~ replace(., is.na(.), "-")))
-  
-  return(cuadro_final)
-}
-
-# Aplicar la función a cada trimestre
-c.4_niveled_tamanio_sexo_resultados <- lapply(base_asalariados_trimestres, calcular_niveled_tamanio_sexo)
-
-# Consolidar los resultados
-c.4_niveled_tamanio_sexo_consolidado <- bind_rows(c.4_niveled_tamanio_sexo_resultados)
-
-# Mostrar resultado consolidado (Ver) # otra forma de verlo?
-print(c.4_niveled_tamanio_sexo_consolidado)
 
 ########################################################################################
 
 #sript 05
 
-calcular_rama_sexo <- function(df) {
-  cuadro_base <- df %>% 
-    filter(ESTADO == 1 & CAT_OCUP == 3) %>% 
-    group_by(caes_seccion_label, anio_trim) %>%
-    summarise(
-      Poblacion_Ambos = sum(PONDERA, na.rm = TRUE),
-      Poblacion_Varones = sum(PONDERA[CH04 == 1], na.rm = TRUE),
-      Poblacion_Mujeres = sum(PONDERA[CH04 == 2], na.rm = TRUE),
-      .groups = "drop"
-    ) %>%
-    mutate(
-      Prop_Ambos = Poblacion_Ambos / sum(Poblacion_Ambos, na.rm = TRUE),
-      Prop_Varones = Poblacion_Varones / Poblacion_Ambos,
-      Prop_Mujeres = Poblacion_Mujeres / Poblacion_Ambos
-    )
+
+calcular_rama_estab_condicion_registro <- function(df, tipo_estab = NULL, etiqueta_estab) {
+  # Convertir PP04A a numérico para evitar errores de tipo
+  df <- df %>% mutate(PP04A = as.numeric(PP04A))
   
-  # Calcular fila de total
-  total_fila <- cuadro_base %>%                #####ACA totales por TREMESTRE######
-    summarise(
-      caes_seccion_label = "Total",
-      across(where(is.numeric), sum, na.rm = TRUE)
-    )
-  
-  # Unir resultados
-  cuadro_final <- bind_rows(cuadro_base, total_fila) %>%
-    mutate(across(everything(), ~ replace(., is.na(.), "-")))
-  
-  return(cuadro_final)
-}
-
-# Aplicar la función a cada trimestre
-c.5_rama_sexo_resultados <- lapply(base_asalariados_trimestres, calcular_rama_sexo)
-
-# Consolidar los resultados
-c.5_rama_sexo_consolidado <- bind_rows(c.5_rama_sexo_resultados)
-
-# Mostrar resultado consolidado
-print(c.5_rama_sexo_consolidado)
-
-
-########################################################################################
-
-#script 06
-
-calcular_estab_condicion_registro <- function(df, tipo_estab = NULL, etiqueta_estab) {
   if (!is.null(tipo_estab)) {
     df <- df %>% filter(PP04A == tipo_estab)  # Filtrar por tipo de establecimiento si se especifica
   }
   
+  # Forzar formato de anio_trim "YYYYTn"
+  df <- df %>% mutate(anio_trim = str_extract(as.character(anio_trim), "^[0-9]{4}T[0-9]"))
+  
   cuadro_base <- df %>%
     filter(ESTADO == 1, CAT_OCUP == 3) %>%
-    group_by(caes_seccion_label, anio_trim) %>%
+    group_by(anio_trim, caes_seccion_label) %>%  
     summarise(
-      total = sum(PONDERA, na.rm = TRUE),
-      Asal_protegidos = sum(PONDERA[PP07H == 1], na.rm = TRUE),
-      Asal_precarios_tot = sum(PONDERA[PP07H == 2], na.rm = TRUE),
+      total                 = sum(PONDERA, na.rm = TRUE),
+      Asal_protegidos       = sum(PONDERA[PP07H == 1], na.rm = TRUE),
+      Asal_precarios_tot    = sum(PONDERA[PP07H == 2], na.rm = TRUE),
       Asal_precarios_i1_mono = sum(PONDERA[PP07H == 2 & PP07I == 1], na.rm = TRUE),
       Asal_precarios_i2_negr = sum(PONDERA[PP07H == 2 & PP07I == 2], na.rm = TRUE),
       .groups = "drop"
     ) %>%
     mutate(
-      part_asal_prote = Asal_protegidos / total,
-      part_asal_precarios = Asal_precarios_tot / total,
-      part_mono_en_precarios = Asal_precarios_i1_mono / Asal_precarios_tot,
+      part_asal_prote         = Asal_protegidos / total,
+      part_asal_precarios     = Asal_precarios_tot / total,
+      part_mono_en_precarios  = Asal_precarios_i1_mono / Asal_precarios_tot,
       part_negro_en_precarios = Asal_precarios_i2_negr / Asal_precarios_tot,
-      part_NSNR_en_precarios = (Asal_precarios_tot - Asal_precarios_i1_mono - Asal_precarios_i2_negr) / Asal_precarios_tot
+      part_NSNR_en_precarios  = (total - Asal_precarios_i1_mono - Asal_precarios_i2_negr) / Asal_precarios_tot
     )
   
-  # Calcular fila de total por establecimiento
-  total_fila <- cuadro_base %>%                     #####ACA totales por TREMESTRE######
+  # Calcular fila de total
+  total_fila <- cuadro_base %>%
     summarise(
       caes_seccion_label = "Total",
       across(where(is.numeric), sum, na.rm = TRUE)
     )
   
-  # Agregar columna de establecimiento
-  cuadro_estab_condicion_registro <- bind_rows(cuadro_base, total_fila) %>%
+  cuadro_rama_estab_condicion_registro <- bind_rows(cuadro_base, total_fila) %>%
     mutate(tipo_establecimiento = etiqueta_estab)
   
-  return(cuadro_estab_condicion_registro)
+  return(cuadro_rama_estab_condicion_registro)
 }
 
-# Calcular cuadros con totales por tipo de establecimiento para cada trimestre
-cuadro_estab_resultados <- lapply(base_asalariados_trimestres, function(x) {
-  list(
-    total = calcular_estab_condicion_registro(x, NULL, "Total"),
-    estatal = calcular_estab_condicion_registro(x, 1, "Estatal"),
-    privado = calcular_estab_condicion_registro(x, 2, "Privado"),
-    otro = calcular_estab_condicion_registro(x, 3, "Otro")
-  )
+# Generar el análisis por trimestres sin usar lapply
+c.5_rama_cond.registro_tipo.establec_consolidado <- map_dfr(trimestres, function(df) {
+  cuadro_total   <- calcular_rama_estab_condicion_registro(df, NULL, "Total")
+  cuadro_estatal <- calcular_rama_estab_condicion_registro(df, 1, "Estatal")
+  cuadro_privado <- calcular_rama_estab_condicion_registro(df, 2, "Privado")
+  cuadro_otro    <- calcular_rama_estab_condicion_registro(df, 3, "Otro")
+  
+  bind_rows(cuadro_total, cuadro_estatal, cuadro_privado, cuadro_otro)
 })
 
-# Unir todos los cuadros por trimestre
-c.6_estab_condicion_registro_tipo_consolidado <- do.call(bind_rows, lapply(cuadro_estab_resultados, bind_rows))
+# Mostrar resultado final consolidado
+print(c.5_rama_cond.registro_tipo.establec_consolidado)
 
-# Mostrar resultado consolidado
-print(c.6_estab_condicion_registro_tipo_consolidado)
+
 
 #############################################################################
 
-#script 07
+#script 06
 
-# Función para aplicar calcular_rama_sexo a cada trimestre
-calcular_rama_sexo_trimestral <- function(df) {
-  cuadro_base <- df %>% 
-    filter(ESTADO == 1 & CAT_OCUP == 3) %>% 
-    group_by(anio_trim, caes_seccion_label) %>%  # Agregado anio_trim
-    summarise(
-      Poblacion_Ambos = sum(PONDERA, na.rm = TRUE),
-      Poblacion_Varones = sum(PONDERA[CH04 == 1], na.rm = TRUE),
-      Poblacion_Mujeres = sum(PONDERA[CH04 == 2], na.rm = TRUE),
-      .groups = "drop"
-    ) %>%
-    mutate(
-      Prop_Ambos = Poblacion_Ambos / sum(Poblacion_Ambos, na.rm = TRUE),
-      Prop_Varones = Poblacion_Varones / Poblacion_Ambos,
-      Prop_Mujeres = Poblacion_Mujeres / Poblacion_Ambos
-    )
-  
-  # Calcular fila de total por trimestre
-  total_fila <- cuadro_base %>%
-    group_by(anio_trim) %>%  # Agregado anio_trim
-    summarise(
-      caes_seccion_label = "Total",
-      across(where(is.numeric), sum, na.rm = TRUE),
-      .groups = "drop"
-    )
-  
-  # Unir resultados
-  cuadro_final <- bind_rows(cuadro_base, total_fila) %>%
-    mutate(across(everything(), ~ replace(., is.na(.), "-")))
-  
-  return(cuadro_final)
-}
-
-# Aplicar la función a la base de datos
-c.7.1_rama_sexo_consolidado <- calcular_rama_sexo_trimestral(base_asalariados)
-
-
-calcular_rama_condicion_registro_trimestral <- function(df) {
+cuadro_precariedad_trimestral <- function(df) {
   cuadro_base <- df %>%
-    filter(ESTADO == 1, CAT_OCUP == 3) %>%
-    group_by(TRIMESTRE, caes_seccion_label) %>%
+    filter(ESTADO == 1 & CAT_OCUP == 3) %>%
+    group_by(anio_trim) %>%
     summarise(
-      total = sum(PONDERA[CAT_OCUP == 3], na.rm = TRUE),
-      Asal_protegidos = sum(PONDERA[CAT_OCUP == 3 & PP07H == 1], na.rm = TRUE),
-      Asal_precarios_tot = sum(PONDERA[CAT_OCUP == 3 & PP07H == 2], na.rm = TRUE),
-      Asal_precarios_i1_mono = sum(PONDERA[CAT_OCUP == 3 & PP07I == 1], na.rm = TRUE),
-      Asal_precarios_i2_negr = sum(PONDERA[CAT_OCUP == 3 & PP07I == 2], na.rm = TRUE),
+      Total_Ambos   = sum(PONDERA, na.rm = TRUE),
+      Total_Varones = sum(PONDERA[CH04 == 1], na.rm = TRUE),
+      Total_Mujeres = sum(PONDERA[CH04 == 2], na.rm = TRUE),
+      
+      Signo1_Ambos  = sum(PONDERA[signo_educ_tamaño == 1], na.rm = TRUE),
+      Signo1_Varones = sum(PONDERA[CH04 == 1 & signo_educ_tamaño == 1], na.rm = TRUE),
+      Signo1_Mujeres = sum(PONDERA[CH04 == 2 & signo_educ_tamaño == 1], na.rm = TRUE),
+      
+      Signo2_Ambos  = sum(PONDERA[signo_sindescuento == 1], na.rm = TRUE),
+      Signo2_Varones = sum(PONDERA[CH04 == 1 & signo_sindescuento == 1], na.rm = TRUE),
+      Signo2_Mujeres = sum(PONDERA[CH04 == 2 & signo_sindescuento == 1], na.rm = TRUE),
+      
+      Signo3_Ambos  = sum(PONDERA[signo_tiempo == 1], na.rm = TRUE),
+      Signo3_Varones = sum(PONDERA[CH04 == 1 & signo_tiempo == 1], na.rm = TRUE),
+      Signo3_Mujeres = sum(PONDERA[CH04 == 2 & signo_tiempo == 1], na.rm = TRUE),
+      
+      Signo4_Ambos  = sum(PONDERA[signo_tecno_calif == 1], na.rm = TRUE),
+      Signo4_Varones = sum(PONDERA[CH04 == 1 & signo_tecno_calif == 1], na.rm = TRUE),
+      Signo4_Mujeres = sum(PONDERA[CH04 == 2 & signo_tecno_calif == 1], na.rm = TRUE),
+      
+      Almenos1de3_Ambos = sum(PONDERA[almenos1de3 == 1], na.rm = TRUE),
+      Almenos1de3_Varones = sum(PONDERA[CH04 == 1 & almenos1de3 == 1], na.rm = TRUE),
+      Almenos1de3_Mujeres = sum(PONDERA[CH04 == 2 & almenos1de3 == 1], na.rm = TRUE),
+      
+      Sin_preca_Ambos = sum(PONDERA[sin_preca_de3 == 1], na.rm = TRUE),
+      Sin_preca_Varones = sum(PONDERA[CH04 == 1 & sin_preca_de3 == 1], na.rm = TRUE),
+      Sin_preca_Mujeres = sum(PONDERA[CH04 == 2 & sin_preca_de3 == 1], na.rm = TRUE),
       .groups = "drop"
     ) %>%
-    mutate(
-      part_asal_prote = Asal_protegidos / total,
-      part_asal_precarios = Asal_precarios_tot / total,
-      part_mono_en_precarios = Asal_precarios_i1_mono / Asal_precarios_tot,
-      part_negro_en_precarios = Asal_precarios_i2_negr / Asal_precarios_tot,
-      part_NSNR_en_precarios = (total - Asal_precarios_i1_mono - Asal_precarios_i2_negr) / Asal_precarios_tot
-    )
+    pivot_longer(cols = -anio_trim, names_to = "Categoria", values_to = "Frecuencia") %>%
+    mutate(Sexo = case_when(
+      str_detect(Categoria, "_Ambos$") ~ "Ambos",
+      str_detect(Categoria, "_Varones$") ~ "Varones",
+      str_detect(Categoria, "_Mujeres$") ~ "Mujeres"
+    )) %>%
+    mutate(Indicador = str_remove(Categoria, "_(Ambos|Varones|Mujeres)$")) %>%
+    select(anio_trim, Sexo, Indicador, Frecuencia) %>%
+    pivot_wider(names_from = Indicador, values_from = Frecuencia) %>%
+    mutate(Proporcion = round(Almenos1de3 / Total * 100, 2)) %>%
+    rename(Poblacion = Total)
   
-  # Calcular fila de total por trimestre
-  total_fila <- cuadro_base %>%
-    group_by(TRIMESTRE) %>%
-    summarise(
-      caes_seccion_label = "Total",
-      across(where(is.numeric), sum, na.rm = TRUE)
-    )
-  
-  # Unir resultados
-  cuadro_final <- bind_rows(cuadro_base, total_fila) %>%
-    mutate(across(everything(), ~ replace(., is.na(.), "-")))
-  
-  return(cuadro_final)
+  return(cuadro_base)
 }
 
-# Aplicar la función
-c.7.2_rama_condicion_registro_final <- calcular_rama_condicion_registro_trimestral(base)
+# Aplicar la función y consolidar los resultados
+c.6_signos_preca_consolidado <- base_asalariados %>%
+  group_by(anio_trim) %>%
+  do(cuadro_precariedad_trimestral(.)) %>%
+  ungroup()
 
-# Mostrar resultado # (Ver)
-print(c.7.2_rama_condicion_registro_final)
-
-#############################################################################
-
-#script 08
-
-
-cuadro_precariedad_ambos_trimestral <- function(df) {
-  indicadores <- df %>%
-    group_by(TRIMESTRE) %>%
-    summarise(
-      Total = n(),
-      "Signo 1: Educación-Tamaño" = sum(signo_educ_tamaño, na.rm = TRUE),
-      "Signo 2: Sin Descuento Jubilatorio" = sum(signo_sindescuento, na.rm = TRUE),
-      "Signo 3: Tiempo (PT involuntario + Indeterminado)" = sum(signo_tiempo, na.rm = TRUE),
-      "Signo 4: Tecnología-Calificación" = sum(signo_tecno_calif, na.rm = TRUE),
-      "Total con al menos 1 de 3" = sum(almenos1de3, na.rm = TRUE),
-      "Total sin signos de precariedad" = sum(sin_preca_de3, na.rm = TRUE),
-      .groups = "drop"
-    ) %>%
-    pivot_longer(cols = -c(Total, TRIMESTRE), names_to = "Indicador", values_to = "Frecuencia_ambos") %>%
-    mutate(Proporcion_ambos = round(Frecuencia_ambos / Total * 100, 2)) %>%
-    pivot_wider(names_from = TRIMESTRE, values_from = c(Frecuencia_ambos, Proporcion_ambos))
-  
-  return(indicadores)
-}
-
-cuadro_precariedad_sexo_trimestral <- function(df) {
-  indicadores <- df %>%
-    group_by(TRIMESTRE, CH04) %>%  # CH04 es la columna de sexo
-    summarise(
-      Total = n(),
-      "Signo 1: Educación-Tamaño" = sum(signo_educ_tamaño, na.rm = TRUE),
-      "Signo 2: Sin Descuento Jubilatorio" = sum(signo_sindescuento, na.rm = TRUE),
-      "Signo 3: Tiempo (PT involuntario + Indeterminado)" = sum(signo_tiempo, na.rm = TRUE),
-      "Signo 4: Tecnología-Calificación" = sum(signo_tecno_calif, na.rm = TRUE),
-      "Total con al menos 1 de 3" = sum(almenos1de3, na.rm = TRUE),
-      "Total sin signos de precariedad" = sum(sin_preca_de3, na.rm = TRUE),
-      .groups = "drop"
-    ) %>%
-    pivot_longer(cols = -c(Total, CH04, TRIMESTRE), names_to = "Indicador", values_to = "Frecuencia") %>%
-    mutate(Proporcion = round(Frecuencia / Total * 100, 2)) %>%
-    pivot_wider(names_from = c(TRIMESTRE, CH04), values_from = c(Frecuencia, Proporcion)) 
-  
-  return(indicadores)
-}
-
-# Llamar ambas funciones
-cuadro_general <- cuadro_precariedad_ambos_trimestral(base_asalariados)
-cuadro_sexo <- cuadro_precariedad_sexo_trimestral(base_asalariados)
-
-# Combinar los resultados
-c.8_signos_preca_final <- bind_rows(cuadro_general, cuadro_sexo)
-rm(cuadro_general, cuadro_sexo)
-
-# Ver el resultado
-print(c.8_signos_preca_final)
+# Verificar estructura
+str(c.6_signos_preca_consolidado)
 
 #############################################################################
 
 #script 09
 #script 91
 
-tabla_preca_SS_sexo_trimestral <- calculate_tabulates(
-  base = base_asalariados,
-  x = c("anio_trim", "CH04"),  # Sexo por trimestre (Ver : no anda)
-  y = "signo_sindescuento",
-  weights = "PONDERA"
-)
-print(tabla_preca_SS_sexo_trimestral)
-
-# Análisis por nivel educativo (ambos sexos)
-tabla_preca_SS_educ_trimestral <- calculate_tabulates(
-  base = base_asalariados,
-  x = c("anio_trim", "nivel.ed1"),
-  y = "signo_sindescuento",
-  weights = "PONDERA"
-) %>%
-  mutate(sexo = "Ambos")
-print(tabla_preca_SS_educ_trimestral)
-
-tabla_precaSS_educ_varon_trimestral <- base_asalariados %>%
-  filter(CH04 == "1") %>%  # Solo varones
-  calculate_tabulates(
-    x = c("anio_trim", "nivel.ed1"),
-    y = "signo_sindescuento",
+# Función para calcular la tabla de precariedad sin descuento por sexo, nivel educativo y trimestre
+calcular_precariedad_sexo_trimestral <- function(base) {
+  
+  # Tabla para Ambos sexos, incluyendo nivel educativo
+  tabla_preca_SS_sexo_trimestral <- calculate_tabulates(
+    base = base,
+    x = "anio_trim",  # Trimestre
+    y = "nivel.ed1",   # Nivel educativo
     weights = "PONDERA"
   ) %>%
-  mutate(sexo = "Varón")
-print(tabla_precaSS_educ_varon_trimestral)
+    mutate(sexo = "Ambos")  # Se agrega etiqueta general para ambos sexos
+  
+  # Tabla para varones, filtrando por sexo y calculando por nivel educativo
+  tabla_precaSS_educ_varon_trimestral <- base %>%
+    filter(CH04 == 1) %>%  # Filtrar para varones (CH04 == 1)
+    calculate_tabulates(
+      x = "anio_trim",  # Trimestre
+      y = "nivel.ed1",   # Nivel educativo
+      weights = "PONDERA"
+    ) %>%
+    mutate(sexo = "Varón")
+  
+  # Tabla para mujeres, filtrando por sexo y calculando por nivel educativo
+  tabla_precaSS_educ_mujer_trimestral <- base %>%
+    filter(CH04 == 2) %>%  # Filtrar para mujeres (CH04 == 2)
+    calculate_tabulates(
+      x = "anio_trim",  # Trimestre
+      y = "nivel.ed1",   # Nivel educativo
+      weights = "PONDERA"
+    ) %>%
+    mutate(sexo = "Mujer")
+  
+  # Combinar las tablas
+  resultado_final <- bind_rows(
+    tabla_preca_SS_sexo_trimestral,
+    tabla_precaSS_educ_varon_trimestral,
+    tabla_precaSS_educ_mujer_trimestral
+  )
+  
+  # Limpiar variables innecesarias
+  objetos <- c("tabla_precaSS_educ_varon_trimestral", "tabla_precaSS_educ_mujer_trimestral",
+               "tabla_preca_SS_sexo_trimestral")
+  rm(list = intersect(objetos, ls()))
+  
+  # Eliminar columna `total` si existe
+  if ("total" %in% names(resultado_final)) {
+    resultado_final <- resultado_final %>% select(-total)
+  }
+  
+  return(resultado_final)
+}
 
-tabla_precaSS_educ_mujer_trimestral <- base_asalariados %>%
-  filter(CH04 == "2") %>%  # Solo mujeres
-  calculate_tabulates(
-    x = c("anio_trim", "nivel.ed1"),
-    y = "signo_sindescuento",
-    weights = "PONDERA"
-  ) %>%
-  mutate(sexo = "Mujer")
-print(tabla_precaSS_educ_mujer_trimestral)
+# Aplicar la función a la base de datos
+c.91_precaSS_educ_sexo_final <- calcular_precariedad_sexo_trimestral(base_asalariados)
 
-# Consolidar las tablas
-c.91_precaSS_educ_sexo_final <- bind_rows(
-  tabla_preca_SS_educ_trimestral,
-  tabla_precaSS_educ_varon_trimestral,
-  tabla_precaSS_educ_mujer_trimestral
-)
-
-# Limpiar variables innecesarias
-objetos <- c("tabla_precaSS_educ_varon_trimestral", "tabla_precaSS_educ_mujer_trimestral",
-             "tabla_preca_SS_sexo_trimestral", "tabla_preca_SS_educ_trimestral")
-rm(list = intersect(objetos, ls()))
-c.91_precaSS_educ_sexo_final <- c.91_precaSS_educ_sexo_final %>% select(-total)
-
-# Ver resultado final
+# Ver el resultado final
 print(c.91_precaSS_educ_sexo_final)
 
 # calculate_tabulates <- function(base, x, y, weights) {
