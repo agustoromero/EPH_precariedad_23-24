@@ -21,7 +21,7 @@
   
   # Función para descargar y guardar datos en RDS #### 
 # Tiltie esta parte para no repetir con las lineas 40--52
-  descargar_datos <- function(ano, trimestre) {
+{  descargar_datos <- function(ano, trimestre) {
     archivo <- paste0(ruta_datos, "base_", ano, "_T", trimestre, ".rds")
 
     if (!file.exists(archivo)) {  # Descargar solo si el archivo no existe
@@ -53,7 +53,7 @@
       return(NULL)
     }
   }
-  
+} 
   # Importar y combinar todos los archivos
   lista_datos <- lapply(1:nrow(trimestres_seleccionados), function(i) {
     importar_datos(trimestres_seleccionados$ANO4[i], 
@@ -171,7 +171,7 @@ base_asalariados <- base_asalariados %>%
     # Signo de precariedad tecnológica y de calificación
     preca_tecno_calif = case_when(
       TECNOLOGIA == 1 & CALIFICACION == 1 ~ 4,  # Solo cuando ambos son 1
-      TRUE ~ 0 ),
+      <TRUE ~ 0 ),
     
     # Clasificación de educación
     nivel.ed = factor(case_when(
