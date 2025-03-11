@@ -1,0 +1,607 @@
+---
+title: "R de Resultados"
+author: "Agus Romero y Gaspo Herrero"
+date: "2025-03-09"
+output:
+  html_notebook:
+    toc: true
+    toc_float: true
+  html_document:
+    toc: true
+    df_print: paged
+---
+
+------------------------------------------------------------------------
+
+# Intro
+
+Objetivo: Nos interesaexplorar los principales cambios en el Mercado de Trabajo a raíz del nuevo gobierno como guía para explorar las herramientas.
+
+Para trabajar en el entorno compartido de github configuarmos una carpeta de origen de la información (*El pescado*), una carpeta con los Scripts (*El cuchillo*) y una carpeta con los resultados (*Las tripas*).
+
+Como la idea era poder aplicarlo de manera repetida para los distintos trimestres y poder construir series, decidimos que el pescado contenga todas las bases de interes. Que los Scripts trabajan principalmente con funciones que permitan la repitencia trimestre a trimestre. Y en este caso, los resultados, en lugar de ser los presentados en la carpeta resultados, serán presentados en este Markdown (el kanicama).
+
+# Primeros cambios en la base
+
+Construimos un entorno de trabajo y una funcion para descargar la información para luego descargar las y juntarlas, ya listas para trabajar y transformar toda junta.
+
+```{r echo=TRUE, message=FALSE}
+#Librerías
+# Librerías necesarias
+  library(tidyverse)
+  library(eph)
+  library(haven)
+  library(dplyr)
+  library(readr)
+  library(openxlsx)
+  library(stringr)
+  library(purrr)
+  
+# Configuro mi espacio de trabajo y armo las primeras direcciones y funciones
+#Ruta donde se almacenan los archivos RDS
+  ruta_datos <- "01_data/"
+  
+  # Función para importar datos desde RDS
+  importar_datos <- function(ano, trimestre) {
+    archivo <- paste0(ruta_datos, "base_", ano, "_T", trimestre, ".rds")
+    
+    if (file.exists(archivo)) {
+      datos <- readRDS(archivo) %>%
+        mutate(anio_trim = paste0(ANO4, "T", TRIMESTRE))  # Agregar columna para identificación
+      
+      return(datos)
+    } else {
+      message("No se encontró: ", archivo)
+      return(NULL)
+    }
+  }
+  
+  # Definir los trimestres de interés (3T 2023 hasta 2T 2024)
+  trimestres_seleccionados <- expand.grid(
+    ANO4 = 2023:2024, 
+    TRIMESTRE = 1:4
+  ) %>%
+    filter(!(ANO4 == 2023 & TRIMESTRE < 3),  # Excluir antes del 3T 2023
+           !(ANO4 == 2024 & TRIMESTRE > 2))  # Excluir después del 2T 2024
+
+# Importar y combinar todos los archivos
+  lista_datos <- lapply(1:nrow(trimestres_seleccionados), function(i) {
+    importar_datos(trimestres_seleccionados$ANO4[i], 
+                   trimestres_seleccionados$TRIMESTRE[i])
+  })
+  
+  # Unir todas las bases en una sola ####
+  base <- bind_rows(lista_datos)
+
+```
+
+Con la base inicial, incorporamos las variables del CAES y el CNO. Construimos unas variables de rango etario y nivel educativo (diferenciando superior completo e incompleto)
+
+```{r include=FALSE}
+   
+  # Organizar etiquetas y cla1ficaciones
+base <- base %>%
+    organize_caes() %>%   # Etiquetas según CAES
+    organize_cno()        # Cla1ficación según CNO
+  
+head(base)
+# Comienza el juego de las bases #### 
+base <- readRDS("01_data/input_original/bases_originales.rds")
+
+# Crear variables rango_etario y nivel.ed1
+base <- base %>%
+  mutate(
+    rango_etario = case_when(
+      CH06 < 19  ~ "Menor a 19",
+      CH06 >= 19 & CH06 <= 25 ~ "19 a 25",
+      CH06 >= 26 & CH06 <= 35 ~ "26 a 35",
+      CH06 >= 36 & CH06 <= 45 ~ "36 a 45",
+      CH06 >= 46 & CH06 <= 55 ~ "46 a 55",
+      CH06 >= 56 & CH06 <= 65 ~ "56 a 65",
+      CH06 >= 66 & CH06 <= 75 ~ "66 a 75",
+      CH06 >= 76 & CH06 <= 85 ~ "76 a 85",
+      CH06 > 85  ~ "Mayor a 85",
+      TRUE ~ NA_character_
+    ),
+    nivel.ed1 = factor(case_when(
+      NIVEL_ED %in% c(7,1,2,3) ~ "Menor a Secundaria", 
+      NIVEL_ED %in% 4 ~ "Secundaria Completa",
+      NIVEL_ED == 5 ~ "Superior Incompleto",
+      NIVEL_ED == 6 ~ "Superior Completo",
+      TRUE ~ "Ns/Nr"
+    ), levels = c("Menor a Secundaria","Secundaria Completa","Superior Incompleto","Superior Completo"))
+  )
+
+# Filtrar ocupados
+base_ocupados <- base %>%
+  filter(ESTADO == 1)
+
+# Guardar base ocupados
+saveRDS(base_ocupados, "01_data/outputs_filtros/bases_ocupados.rds")
+
+# Cargar base de ocupados
+#base_ocupados <- readRDS("01_data/outputs_filtros/bases_ocupados.rds")
+
+
+```
+
+Como segundos cambios, introducimos las primeras variables para cateogrizar precariedad en la población ocupada. A destacar, esta el cambio en la construcción de la variable de "tamaño del establacimiento" para realizar cruces.
+
+```{r}
+base_ocupados <- base %>%
+  filter(ESTADO== 1) %>%
+  mutate(
+    tamanio.establec.nueva = case_when(
+      !is.na(PP04C99) ~ case_when(
+        PP04C99 == 1 ~ "peque",
+        PP04C99 == 2 ~ "mediano",
+        PP04C99 == 3 ~ "grande",
+        PP04C99 == 9 ~ "NS/NR"
+      ),
+      PP04C == 1 ~ "uni",
+      PP04C %in% c(2, 3, 4, 5) ~ "peque",
+      PP04C %in% c(6, 7, 8) ~ "mediano",
+      PP04C %in% c(9, 10, 11, 12) ~ "grande",
+      TRUE ~ NA_character_
+    ),
+    antiguedad_empleo = case_when(
+      as_factor(PP07A) %in% c("1", "2", "3", "4", "5", "6") ~ as_factor(PP07A),#asalariados
+      as_factor(PP05H) %in% c("1", "2", "3", "4", "5", "6") ~ as_factor(PP05H) #no asalariados (independientes/cuentapropia)
+    ), 
+    antiguedad_empleo = factor(
+      antiguedad_empleo, 
+      levels = c("1", "2", "3", "4", "5", "6"),
+      labels = c("menor a 1 mes", "1 a 3 meses", "más de 3 a 6 meses", 
+                 "más de 6 a 12 meses", "más de 1 año a 5 años", "más de 5 años")
+    )
+  )
+
+
+#Creo la base asalariados
+base_asalariados <- base_ocupados %>% filter(CAT_OCUP==3)
+
+# Guardar base asalariados
+saveRDS(base_ocupados, "01_data/outputs_filtros/bases_ocupados.rds")
+
+saveRDS(base_asalariados, "01_data/outputs_filtros/bases_asalariados.rds")
+```
+
+```{r}
+filtrar_por_trimestre <- function(df, anio, trimestre) {
+  # Crear la columna anio.trim para el formato YYYYTn
+  df <- df %>%
+    mutate(anio_trim = paste(ANO4, "T", TRIMESTRE, sep = ""))
+  
+  # Filtrar el dataframe usando str_detect para los patrones "YYYYTn"
+  df_filtrado <- df %>%
+    filter(str_detect(anio_trim, paste(anio, "T", trimestre, sep = "")))
+  
+  return(df_filtrado)
+}
+
+# Funciones para cálculos
+calcular_poblacion_estado <- function(df) {
+  # Asegurarnos de que ESTADO sea un factor
+  df$ESTADO <- as.factor(df$ESTADO)
+  
+  c.1.1_estado_sexo <- df %>%
+    group_by(ESTADO, anio_trim) %>%
+    summarise(
+      Poblacion_Ambos = sum(PONDERA, na.rm = TRUE),
+      Poblacion_Varones = sum(PONDERA[CH04 == 1], na.rm = TRUE),
+      Poblacion_Mujeres = sum(PONDERA[CH04 == 2], na.rm = TRUE),
+      .groups = "drop"
+    ) %>%
+    mutate(across(Poblacion_Ambos:Poblacion_Mujeres, ~ replace(., is.na(.), "-")))
+  
+  # A1gnar niveles a ESTADO
+  levels(c.1.1_estado_sexo$ESTADO) <- c("Entrevista no realizada", "Ocupado", "Desocupado", "Inactivo", "Menor de 10 años")
+  
+  return(c.1.1_estado_sexo)
+}
+
+calcular_poblacion_estado_cat_ocup <- function(df) {
+  df_ocupado <- df %>%
+    filter(ESTADO == 1)
+  
+  df_ocupado$ESTADO <- as.factor(df_ocupado$ESTADO)
+  df_ocupado$CAT_OCUP <- as.factor(df_ocupado$CAT_OCUP)
+  
+  c.1.2_cat_ocup <- df_ocupado %>%
+    group_by(CAT_OCUP, anio_trim) %>%
+    summarise(
+      Poblacion_Ambos = sum(PONDERA, na.rm = TRUE),
+      Poblacion_Varones = sum(PONDERA[CH04 == 1], na.rm = TRUE),
+      Poblacion_Mujeres = sum(PONDERA[CH04 == 2], na.rm = TRUE),
+      .groups = "drop"
+    ) %>%
+    mutate(across(Poblacion_Ambos:Poblacion_Mujeres, ~ replace(., is.na(.), "-")))
+  
+  levels(c.1.2_cat_ocup$CAT_OCUP) <- c("Patrón", "Cuenta propia", "Obrero o empleado", 
+                                       "Trabajador familiar 1n remuneración", "Ns./Nr.")
+  
+  return(c.1.2_cat_ocup)
+}
+trimestres <- list(
+  "2023_3" = filtrar_por_trimestre(base, "2023", 3),
+  "2023_4" = filtrar_por_trimestre(base, "2023", 4),
+  "2024_1" = filtrar_por_trimestre(base, "2024", 1),
+  "2024_2" = filtrar_por_trimestre(base, "2024", 2))
+
+# Aplicar las funciones a cada trimestre y consolidar los resultados
+c.1.1_resultados <- lapply(trimestres, calcular_poblacion_estado)
+c.1.2_resultados <- lapply(trimestres, calcular_poblacion_estado_cat_ocup)
+
+# Definir los trimestres de interés usando el formato "YYYYTn" deseado
+trimestres <- list(
+  "2023_3" = filtrar_por_trimestre(base, "2023", 3),
+  "2023_4" = filtrar_por_trimestre(base, "2023", 4),
+  "2024_1" = filtrar_por_trimestre(base, "2024", 1),
+  "2024_2" = filtrar_por_trimestre(base, "2024", 2)
+)
+
+# Aplicar la función a cada trimestre y consolidar los resultados
+c.1.1_resultados <- lapply(trimestres, calcular_poblacion_estado)
+
+# Unir los resultados por trimestre
+c.1.1_consolidado <- bind_rows(c.1.1_resultados)
+
+c.1.1_consolidado <- c.1.1_consolidado %>%
+  mutate(
+    Poblacion_Ambos = as.numeric(Poblacion_Ambos),
+    Poblacion_Varones = as.numeric(Poblacion_Varones),
+    Poblacion_Mujeres = as.numeric(Poblacion_Mujeres),
+    Prop_Varones = ifelse(Poblacion_Ambos > 0, Poblacion_Varones / Poblacion_Ambos, 0),
+    Prop_Mujeres = ifelse(Poblacion_Ambos > 0, Poblacion_Mujeres / Poblacion_Ambos, 0)
+  ) %>%
+  replace_na(list(Prop_Varones = 0, Prop_Mujeres = 0))  
+
+```
+
+```{r}
+# Librerías necesarias
+library(dplyr)
+library(ggplot2)
+library(plotly)
+
+
+# Transformar los datos para que sean adecuados para ggplot
+c.1.1_grafico <- c.1.1_consolidado %>%
+  select(ESTADO, anio_trim, Prop_Varones, Prop_Mujeres) %>%
+  pivot_longer(cols = c(Prop_Varones, Prop_Mujeres), 
+               names_to = "Sexo", 
+               values_to = "Proporcion")
+
+# Gráfico
+ggplot(c.1.1_grafico, aes(x = anio_trim, y = Proporcion, fill = Sexo)) +
+  geom_bar(stat = "identity", position = "dodge") +  # Barras agrupadas
+  geom_text(aes(label = scales::percent(Proporcion, accuracy = 0.1)), 
+            position = position_dodge(width = 0.9), 
+            vjust = -0.5, size = 3) +  # Agregar etiquetas de datos
+  facet_wrap(~ESTADO) +  # Un gráfico por cada ESTADO
+  labs(title = "Proporción de Varones y Mujeres por Estado y Trimestre",
+       x = "Trimestre",
+       y = "Proporción",
+       fill = "Sexo") +
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +  # Formato porcentaje
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+
+
+# Transformar los datos para que sean adecuados para ggplot
+# c.1.2_grafico <- c.1.2_consolidado %>%
+#   select(CAT_OCUP, anio_trim, Prop_Varones, Prop_Mujeres) %>%
+#   pivot_longer(cols = c(Prop_Varones, Prop_Mujeres), 
+#                names_to = "Sexo", 
+#                values_to = "Proporcion")
+# 
+# # Gráfico
+# ggplot(c.1.2_grafico, aes(x = anio_trim, y = Proporcion, fill = Sexo)) +
+#   geom_bar(stat = "identity", position = "dodge") +  # Barras agrupadas
+#   geom_text(aes(label = scales::percent(Proporcion, accuracy = 0.1)), 
+#             position = position_dodge(width = 0.9), 
+#             vjust = -0.5, size = 3) +  # Agregar etiquetas de datos
+#   facet_wrap(~CAT_OCUP) +  # Un gráfico por cada categoría ocupacional
+#   labs(title = "Proporción de Varones y Mujeres por Categoría Ocupacional y Trimestre",
+#        x = "Trimestre",
+#        y = "Proporción",
+#        fill = "Sexo") +
+#   scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +  # Formato porcentaje
+#   theme_minimal() +
+#   theme(axis.text.x = element_text(angle = 45, hjust = 1))
+# <<<<<<< HEAD
+```
+
+Con esto ya tenemos preparadas las principales variables para empezar
+
+## Modificaciones para asalariados
+
+```{r}
+
+# Cargar base de asalariados
+base_asalariados <- readRDS("01_data/outputs_filtros/bases_asalariados.rds")
+
+# Crear variables de precariedad ####
+
+#las variables de nivel.ed y tamano ya estan creadas (ver )
+base_asalariados <- base_asalariados %>%
+  mutate(
+    # Signo de precariedad tecnológica y de calificación
+    # preca_tecno_calif = case_when(
+    #   TECNOLOGIA == 1 & CALIFICACION == 1 ~ 4 ),
+    # # Clasificación de educación
+    nivel.ed = factor(case_when(
+      NIVEL_ED %in% c(7,1,2,3) ~ "Menor a Secundaria",
+      NIVEL_ED %in% c(4,5) ~ "Secundaria Completa",
+      NIVEL_ED == 6 ~ "Superior Completo",
+      TRUE ~ "Ns/Nr"
+    ), levels = c("Menor a Secundaria","Secundaria Completa","Superior Completo")),
+    
+    # Clasificación de tamaño del establecimiento
+   tamanio.establec = case_when(
+    PP04C == 1 ~ "uni",
+    PP04C %in% c(2, 3, 4, 5) ~ "peque",
+    PP04C %in% c(6, 7, 8) ~ "mediano",
+    PP04C %in% c(9, 10, 11, 12) ~ "grande",
+    PP04C99 == 1 ~ "peque",
+    PP04C99 == 2 ~ "mediano",
+    PP04C99 == 3 ~ "grande",
+    PP04C99 == 9 ~ "NS/NR",
+    TRUE ~ NA_character_  # Captura valores no definidos
+  ),
+    
+    descuento_jubil = case_when(PP07H == 1 ~ "Si", PP07H == 2 ~ "No"),
+    part.time.inv = case_when(PP3E_TOT < 35 & PP03G == 1 ~ "Si", TRUE ~ "No"),
+    tiempo.determinado = case_when(PP07C == 1 ~ "Si", TRUE ~ "No"),
+    signo_educ_tamaño = as.integer(nivel.ed == "Menor a Secundaria" & tamanio.establec == "Pequeño"),  # 1er signo
+    signo_sindescuento = as.integer(descuento_jubil == "No"),  # 2do signo
+    signo_tiempo = as.integer(part.time.inv == "Si" & tiempo.determinado == "No"),  # 3er signo
+   # signo_tecno_calif = as.integer(preca_tecno_calif == 4),  # 4to signo
+    total_4_signos = signo_educ_tamaño + signo_sindescuento + signo_tiempo 
+  # + signo_tecno_calif
+  ,
+    almenos1de4 = as.integer(total_4_signos >= 1),
+    almenos1de3 = as.integer(signo_educ_tamaño + signo_sindescuento + signo_tiempo >= 1),
+    sin_preca_de3 = as.integer(signo_educ_tamaño + signo_sindescuento + signo_tiempo == 0),
+    sin_preca_de4 = as.integer(total_4_signos == 0)
+  )
+
+# Guardar base con precariedad
+saveRDS(base_asalariados, "01_data/outputs_filtros/bases_precariedad.rds")
+
+```
+
+A continuación, nos quedamos solo con la población asalariada. Y creamos las principales variables con las que evaluar la precariedad:
+
+(i) Tecnología y calificación: los trabajos precarios son trabajos de baja tecnología y baja calificación, en este caso serán con1derados precarios quienes no utilizan ninguna maquinaria como herramientas de trabajo, exceptuando que se trate de profe1onaes.
+
+(ii) Tamaño del establecimiento: los trabajos en establecimientos pequeños se enfrentan a una menor divi1on social y tecnica del trabajo, y a menores niveles de productividad.
+
+     Serán con1derados precarios aquellos que trabajen establecimientos con menos de 5 trabajadores
+
+(iii) Descuento jubilatorio: es una variable históricamente construida para conocer las condiciones de trabajo de las personas asalariadas. 1n embargo, es consensuada como la mejor variable para identificar la condicion de precario en los asalariados. Aquellos que no cuenten con descuentos jubilatorios por el puesto de trabajo, serán con1derados precarios.
+
+(iv) Trabajadores a tiempo parcial involuntario : Los trabajadores subocupados, es decir que trabajan menos de una jornada con1derada normal por razones involuntarias y que están disponibles para trabajar serán con1derados trabajadores en empleos precarios.
+
+     Una vez con1deradas las dimen1ones de precariedad mencionadas, construimos una variable que cuente cuantas de ellas se cumplen para determinadas actividades o grupo de personas.
+
+```{r echo=TRUE}
+# Cargar base de asalariados
+base_asalariados <- readRDS("01_data/outputs_filtros/bases_asalariados.rds")
+# Crear variables de precariedad ####
+base_asalariados <- base_asalariados %>%
+  mutate(
+      # 1gno de precariedad tecnológica y de calificación
+      # preca_tecno_calif = case_when(
+      # TECNOLOGIA == "1n operación de maquina" & CALIFICACION == 1 ~ "4",  # Solo cuando ambos son 1
+      #   TRUE ~ "0" ),
+      
+    # Cla1ficación de educación
+      nivel.ed = factor(case_when(
+        NIVEL_ED %in% c(7,1,2,3) ~ "Menor a Secundaria",
+        NIVEL_ED %in% c(4,5) ~ "Secundaria Completa",
+        NIVEL_ED == 6 ~ "Superior Completo",
+        TRUE ~ "Ns/Nr"),
+        levels = c("Menor a Secundaria","Secundaria Completa","Superior Completo")),
+    
+    # Cla1ficación de tamaño del establecimiento
+   tamanio.establec= case_when(
+    PP04C == 1 ~ "uni",
+    PP04C %in% c(2, 3, 4, 5) ~ "peque",
+    PP04C %in% c(6, 7, 8) ~ "mediano",
+    PP04C %in% c(9, 10, 11, 12) ~ "grande",
+    PP04C99 == 1 ~ "peque",
+    PP04C99 == 2 ~ "mediano",
+    PP04C99 == 3 ~ "grande",
+    PP04C99 == 9 ~ "NS/NR",
+    TRUE ~ NA_character_  ),
+    descuento_jubil = case_when(PP07H == 1 ~ "Si", PP07H == 2 ~ "No"),
+    part.time.inv = case_when(PP3E_TOT < 35 & PP03G == 1 ~ "Si", TRUE ~ "No"),
+    tiempo.determinado = case_when(PP07C == 1 ~ "Si", TRUE ~ "No"),
+    Signo_educ_tamaño = as.integer(nivel.ed == "Menor a Secundaria" & tamanio.establec == "peque"),  # 1er 1gno
+    Signo_1ndescuento = as.integer(descuento_jubil == "No"),  # 2do 1gno
+    Signo_tiempo = as.integer(part.time.inv == "Si" & tiempo.determinado == "Si"),  # 3er 1gno
+    # 1gno_tecno_calif = as.integer(preca_tecno_calif == 4),  # 4to 1gno
+    total_precario = Signo_educ_tamaño + Signo_1ndescuento + Signo_tiempo 
+    # + 1gno_tecno_calif)
+)
+# Guardar base con precariedad
+saveRDS (base_asalariados, "01_data/outputs_filtros/bases_precariedad.rds")
+
+
+```
+
+Por problemas con la variable que vincula calificación y tecnología del puesto de trabajo con la precariedad("Tecnología y calificación" o "preca_tecno_calif"), utilizaremos nivel educativo y tamaño. Intentaremos resolver en próximas experiencias.
+
+# Precariedad según sexo
+
+Intentando explicar las diferencias en el nivel de precariedad entre varones y mujeres y distintas edades.
+
+```{r}
+#1
+C.prueba_sexo <- base_asalariados %>% summarise(
+      Poblacion_Ambos = sum(PONDERA, na.rm = TRUE),
+      Poblacion_Varones = sum(PONDERA[CH04 == 1], na.rm = TRUE),
+      Poblacion_Mujeres = sum(PONDERA[CH04 == 2], na.rm = TRUE),
+      .groups = "drop",
+      'Prop. varones' = Poblacion_Varones / Poblacion_Ambos,
+      'Prop. mujeres' = Poblacion_Mujeres / Poblacion_Ambos
+    )
+#2
+C.prueba_sexo_preca.inten1 <- base_asalariados %>% group_by(total_precario) %>% summarise(
+      Poblacion_Ambos = sum(PONDERA, na.rm = TRUE),
+      Poblacion_Varones = sum(PONDERA[CH04 == 1], na.rm = TRUE),
+      Poblacion_Mujeres = sum(PONDERA[CH04 == 2], na.rm = TRUE),
+      .groups = "drop",
+      'Prop. varones' = Poblacion_Varones / Poblacion_Ambos,
+      'Prop. mujeres' = Poblacion_Mujeres / Poblacion_Ambos
+    )
+#3
+C.prueba_preca.inten1_sexo <- base_asalariados %>% group_by(CH04) %>% summarise(
+      Poblacion_Ambos = sum(PONDERA, na.rm = TRUE),
+      Poblacion_Varones = sum(PONDERA[CH04 == 1], na.rm = TRUE),
+      Poblacion_Mujeres = sum(PONDERA[CH04 == 2], na.rm = TRUE),
+      .groups = "drop",
+      'Prop. varones' = Poblacion_Varones / Poblacion_Ambos,
+      'Prop. mujeres' = Poblacion_Mujeres / Poblacion_Ambos
+    )
+#4
+cuadro_precariedad_ambos_trimestral <- function(df) {
+  indicadores <- df %>%
+    group_by(TRIMESTRE) %>%
+    summarise(
+      Total = n(),
+      "Signo 1: Educación-Tamaño" = sum(Signo_educ_tamaño, na.rm = TRUE),
+      "Signo 2: Sin Descuento Jubilatorio" = sum(Signo_Sindescuento, na.rm = TRUE),
+      "Signo 3: Tiempo (PT involuntario + Indeterminado)" = sum(Signo_tiempo, na.rm = TRUE),
+      # "Signo 4: Tecnología-Calificación" = sum(Signo_tecno_calif, na.rm = TRUE),
+      "Total con al menos 1 de 3" = sum(almenos1de3, na.rm = TRUE),
+      "Total Sin Signos de precariedad" = sum(Sin_preca_de3, na.rm = TRUE),
+      .groups = "drop"
+    ) %>%
+    pivot_longer(cols = -c(Total, TRIMESTRE), names_to = "Indicador", values_to = "Frecuencia_ambos") %>%
+    mutate(Proporcion_ambos = round(Frecuencia_ambos / Total * 100, 2)) %>%
+    pivot_wider(names_from = TRIMESTRE, values_from = c(Frecuencia_ambos, Proporcion_ambos))
+  
+  return(indicadores)
+}
+
+cuadro_precariedad_sexo_trimestral <- function(df) {
+  indicadores <- df %>%
+    group_by(TRIMESTRE, CH04) %>%  # CH04 es la columna de sexo
+    summarise(
+      Total = n(),
+      "Signo 1: Educación-Tamaño" = sum(Signo_educ_tamaño, na.rm = TRUE),
+      "Signo 2: Sin Descuento Jubilatorio" = sum(Signo_Sindescuento, na.rm = TRUE),
+      "Signo 3: Tiempo (PT involuntario + Indeterminado)" = sum(Signo_tiempo, na.rm = TRUE),
+      # "1gno 4: Tecnología-Calificación" = sum(1gno_tecno_calif, na.rm = TRUE),
+      "Total con al menos 1 de 3" = sum(almenos1de3, na.rm = TRUE),
+      "Total Sin Signos de precariedad" = sum(Sin_preca_de3, na.rm = TRUE),
+      .groups = "drop"
+    ) %>%
+    pivot_longer(cols = -c(Total, CH04, TRIMESTRE), names_to = "Indicador", values_to = "Frecuencia") %>%
+    mutate(Proporcion = round(Frecuencia / Total * 100, 2)) %>%
+    pivot_wider(names_from = c(TRIMESTRE, CH04), values_from = c(Frecuencia, Proporcion)) 
+  
+  return(indicadores)
+}
+
+```
+
+#Proporción de precarios según sexo.
+
+Trabajo la información en trimestres
+
+```{r echo=TRUE, message=TRUE, warning=TRUE, paged.print=TRUE}
+filtrar_por_trimestre <- function(df, anio, trimestre) {
+  # Crear la columna anio.trim para el formato YYYYTn
+  df <- df %>%
+    mutate(anio_trim = paste(ANO4, "T", TRIMESTRE, sep = ""))
+  
+  # Filtrar el dataframe usando str_detect para los patrones "YYYYTn"
+  df_filtrado <- df %>%
+    filter(str_detect(anio_trim, paste(anio, "T", trimestre, sep = "")))
+  
+  return(df_filtrado)
+}
+
+# Funciones para cálculos
+calcular_poblacion_estado <- function(df) {
+  # Asegurarnos de que ESTADO sea un factor
+  df$ESTADO <- as.factor(df$ESTADO)
+  
+  c.1.1_estado_sexo <- df %>%
+    group_by(ESTADO, anio_trim) %>%
+    summarise(
+      Poblacion_Ambos = sum(PONDERA, na.rm = TRUE),
+      Poblacion_Varones = sum(PONDERA[CH04 == 1], na.rm = TRUE),
+      Poblacion_Mujeres = sum(PONDERA[CH04 == 2], na.rm = TRUE),
+      .groups = "drop"
+    ) %>%
+    mutate(across(Poblacion_Ambos:Poblacion_Mujeres, ~ replace(., is.na(.), "-")))
+  
+  # A1gnar niveles a ESTADO
+  levels(c.1.1_estado_sexo$ESTADO) <- c("Entrevista no realizada", "Ocupado", "Desocupado", "Inactivo", "Menor de 10 años")
+  
+  return(c.1.1_estado_sexo)
+}
+
+calcular_poblacion_estado_cat_ocup <- function(df) {
+  df_ocupado <- df %>%
+    filter(ESTADO == 1)
+  
+  df_ocupado$ESTADO <- as.factor(df_ocupado$ESTADO)
+  df_ocupado$CAT_OCUP <- as.factor(df_ocupado$CAT_OCUP)
+  
+  c.1.2_cat_ocup <- df_ocupado %>%
+    group_by(CAT_OCUP, anio_trim) %>%
+    summarise(
+      Poblacion_Ambos = sum(PONDERA, na.rm = TRUE),
+      Poblacion_Varones = sum(PONDERA[CH04 == 1], na.rm = TRUE),
+      Poblacion_Mujeres = sum(PONDERA[CH04 == 2], na.rm = TRUE),
+      .groups = "drop"
+    ) %>%
+    mutate(across(Poblacion_Ambos:Poblacion_Mujeres, ~ replace(., is.na(.), "-")))
+  
+  levels(c.1.2_cat_ocup$CAT_OCUP) <- c("Patrón", "Cuenta propia", "Obrero o empleado", 
+                                       "Trabajador familiar 1n remuneración", "Ns./Nr.")
+  
+  return(c.1.2_cat_ocup)
+}
+trimestres <- list(
+  "2023_3" = filtrar_por_trimestre(base, "2023", 3),
+  "2023_4" = filtrar_por_trimestre(base, "2023", 4),
+  "2024_1" = filtrar_por_trimestre(base, "2024", 1),
+  "2024_2" = filtrar_por_trimestre(base, "2024", 2))
+
+# Aplicar las funciones a cada trimestre y consolidar los resultados
+c.1.1_resultados <- lapply(trimestres, calcular_poblacion_estado)
+c.1.2_resultados <- lapply(trimestres, calcular_poblacion_estado_cat_ocup)
+
+# Definir los trimestres de interés usando el formato "YYYYTn" deseado
+trimestres <- list(
+  "2023_3" = filtrar_por_trimestre(base, "2023", 3),
+  "2023_4" = filtrar_por_trimestre(base, "2023", 4),
+  "2024_1" = filtrar_por_trimestre(base, "2024", 1),
+  "2024_2" = filtrar_por_trimestre(base, "2024", 2)
+)
+
+# Aplicar la función a cada trimestre y consolidar los resultados
+c.1.1_resultados <- lapply(trimestres, calcular_poblacion_estado)
+
+# Unir los resultados por trimestre
+c.1.1_consolidado <- bind_rows(c.1.1_resultados)
+
+c.1.1_consolidado <- c.1.1_consolidado %>%
+  mutate(
+    Poblacion_Ambos = as.numeric(Poblacion_Ambos),
+    Poblacion_Varones = as.numeric(Poblacion_Varones),
+    Poblacion_Mujeres = as.numeric(Poblacion_Mujeres),
+    Prop_Varones = ifelse(Poblacion_Ambos > 0, Poblacion_Varones / Poblacion_Ambos, 0),
+    Prop_Mujeres = ifelse(Poblacion_Ambos > 0, Poblacion_Mujeres / Poblacion_Ambos, 0)
+  ) %>%
+  replace_na(list(Prop_Varones = 0, Prop_Mujeres = 0))  
+
+```
