@@ -25,7 +25,7 @@ Como la idea era poder aplicarlo de manera repetida para los distintos trimestre
 
 Construimos un entorno de trabajo y una funcion para descargar la información para luego descargar las y juntarlas, ya listas para trabajar y transformar toda junta.
 
-```{r echo=TRUE, message=FALSE}
+```{r echo=TRUE, message=FALSE, warning=FALSE}
 #Librerías
 # Librerías necesarias
   library(tidyverse)
@@ -47,7 +47,8 @@ Construimos un entorno de trabajo y una funcion para descargar la información p
     
     if (file.exists(archivo)) {
       datos <- readRDS(archivo) %>%
-        mutate(anio_trim = paste0(ANO4, "T", TRIMESTRE))  # Agregar columna para identificación
+        mutate(anio_trim = paste0(ANO4, "T", TRIMESTRE)) 
+  # Agregar columna para identificación
       
       return(datos)
     } else {
@@ -59,10 +60,13 @@ Construimos un entorno de trabajo y una funcion para descargar la información p
   # Definir los trimestres de interés (3T 2023 hasta 2T 2024)
   trimestres_seleccionados <- expand.grid(
     ANO4 = 2023:2024, 
-    TRIMESTRE = 1:4
-  ) %>%
-    filter(!(ANO4 == 2023 & TRIMESTRE < 3),  # Excluir antes del 3T 2023
-           !(ANO4 == 2024 & TRIMESTRE > 2))  # Excluir después del 2T 2024
+    TRIMESTRE = 3
+  ) 
+  # %>%
+  #   filter(!(ANO4 == 2023 & TRIMESTRE < 3),  
+  #          # Excluir antes del 3T 2023
+  #          !(ANO4 == 2024 & TRIMESTRE > 3)) 
+  #          # Excluir después del 2T 2024
 
 # Importar y combinar todos los archivos
   lista_datos <- lapply(1:nrow(trimestres_seleccionados), function(i) {
@@ -125,13 +129,50 @@ saveRDS(base_ocupados, "01_data/outputs_filtros/bases_ocupados.rds")
 
 ```
 
-Como segundos cambios, introducimos las primeras variables para cateogrizar precariedad en la población ocupada. A destacar, esta el cambio en la construcción de la variable de "tamaño del establacimiento" para realizar cruces.
+Como segundos cambios, introducimos las primeras variables para cateogrizar precariedad en la población ocupada.
+
+Durante la construcción de estas variables, se destacan cambios en la construcción de la variable de "tamaño del establacimiento", ya que incorporamos criterios adicionales, presentes en una pregunta de rescate y en una pregunta del bloque de asalariadas particulares, que permite recateogirzar a personas que no contestaron la pregunta original del tamaño del establecimiento.
+
+```{r}
+#Una comparación entre las variables cosntruidas para el tamaño de establecimiento. 
+
+base <- base %>%
+  filter(ESTADO == 1, CAT_OCUP == 3) %>% # Ocupados asalariados
+  mutate(
+    tamanio.establec_original = factor(
+      case_when(PP04C %in% 1:6  ~ "Pequeño",
+                PP04C %in% 7:8  ~ "Mediano",
+                PP04C %in% 9:12 ~ "Grande",
+                PP04C %in% 99   ~ "Ns/Nr"),
+      levels = c("Pequeño","Mediano","Grande","Ns/Nr")))
+
+  
+  
+#Categorizo sin jerarquía y de manera exaustiva.   
+  cuadro_anexo1 <- base %>% 
+    filter(ESTADO == 1, CAT_OCUP == 3) %>%
+    group_by(tamanio.establec_original) %>%
+    summarise(
+    uni= sum(PONDERA[PP04C==1]),
+    peque= sum(PONDERA[PP04C %in% 2:5| (PP04C==99 & PP04C99==1)]),
+    mediano = sum(PONDERA[PP04C %in% 6:8| (PP04C==99 & PP04C99==2)]),
+    grande = sum(PONDERA[PP04C %in% 9:12| (PP04C==99 & PP04C99==3)])
+    )
+  
+write.xlsx (file = "C:/Users/Hache/Documents/GitHub/EPH_precariedad_23-24/cuadros/cuadro_anexo_tamanioestablecimiento.",  cuadro_anexo1)
+
+print(cuadro_anexo1)
+```
+
+Finalmente usaremos la nueva variable propuesta.
+
+#ver porque hay base ocupados y base asalariados y todavia no queda claro cual se utilizará a partir de acá.
 
 ```{r}
 base_ocupados <- base %>%
   filter(ESTADO== 1) %>%
   mutate(
-    tamanio.establec.nueva = case_when(
+    tamanio.establec = case_when(
       !is.na(PP04C99) ~ case_when(
         PP04C99 == 1 ~ "peque",
         PP04C99 == 2 ~ "mediano",
@@ -165,6 +206,10 @@ saveRDS(base_ocupados, "01_data/outputs_filtros/bases_ocupados.rds")
 
 saveRDS(base_asalariados, "01_data/outputs_filtros/bases_asalariados.rds")
 ```
+
+Como este procesamiento fue pensado para construir series y cuadros que puedan replicarse para todas las bases de interés, definidas con anterioridad, construimos la gran mayoria de cuadros y tablas a partir de funciones, como se presenta en el siguiente chunk.
+
+Construimos primero una funcion que nos muestre la información por trimestre. Una funcion para calcular el primer cuadro de población y estado segun sexo.
 
 ```{r}
 filtrar_por_trimestre <- function(df, anio, trimestre) {
@@ -256,67 +301,25 @@ c.1.1_consolidado <- c.1.1_consolidado %>%
   ) %>%
   replace_na(list(Prop_Varones = 0, Prop_Mujeres = 0))  
 
+
+
 ```
-
-```{r}
-# Librerías necesarias
-library(dplyr)
-library(ggplot2)
-library(plotly)
-
-
-# Transformar los datos para que sean adecuados para ggplot
-c.1.1_grafico <- c.1.1_consolidado %>%
-  select(ESTADO, anio_trim, Prop_Varones, Prop_Mujeres) %>%
-  pivot_longer(cols = c(Prop_Varones, Prop_Mujeres), 
-               names_to = "Sexo", 
-               values_to = "Proporcion")
-
-# Gráfico
-ggplot(c.1.1_grafico, aes(x = anio_trim, y = Proporcion, fill = Sexo)) +
-  geom_bar(stat = "identity", position = "dodge") +  # Barras agrupadas
-  geom_text(aes(label = scales::percent(Proporcion, accuracy = 0.1)), 
-            position = position_dodge(width = 0.9), 
-            vjust = -0.5, size = 3) +  # Agregar etiquetas de datos
-  facet_wrap(~ESTADO) +  # Un gráfico por cada ESTADO
-  labs(title = "Proporción de Varones y Mujeres por Estado y Trimestre",
-       x = "Trimestre",
-       y = "Proporción",
-       fill = "Sexo") +
-  scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +  # Formato porcentaje
-  theme_minimal() +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
-
-
-
-
-# Transformar los datos para que sean adecuados para ggplot
-# c.1.2_grafico <- c.1.2_consolidado %>%
-#   select(CAT_OCUP, anio_trim, Prop_Varones, Prop_Mujeres) %>%
-#   pivot_longer(cols = c(Prop_Varones, Prop_Mujeres), 
-#                names_to = "Sexo", 
-#                values_to = "Proporcion")
-# 
-# # Gráfico
-# ggplot(c.1.2_grafico, aes(x = anio_trim, y = Proporcion, fill = Sexo)) +
-#   geom_bar(stat = "identity", position = "dodge") +  # Barras agrupadas
-#   geom_text(aes(label = scales::percent(Proporcion, accuracy = 0.1)), 
-#             position = position_dodge(width = 0.9), 
-#             vjust = -0.5, size = 3) +  # Agregar etiquetas de datos
-#   facet_wrap(~CAT_OCUP) +  # Un gráfico por cada categoría ocupacional
-#   labs(title = "Proporción de Varones y Mujeres por Categoría Ocupacional y Trimestre",
-#        x = "Trimestre",
-#        y = "Proporción",
-#        fill = "Sexo") +
-#   scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +  # Formato porcentaje
-#   theme_minimal() +
-#   theme(axis.text.x = element_text(angle = 45, hjust = 1))
-# <<<<<<< HEAD
-```
-
-Con esto ya tenemos preparadas las principales variables para empezar
 
 ## Modificaciones para asalariados
+
+A continuación, nos quedamos solo con la población asalariada. Y creamos las principales variables con las que evaluar la precariedad:
+
+(i) Tecnología y calificación: los trabajos precarios son trabajos de baja tecnología y baja calificación, en este caso serán considerados precarios quienes no utilizan ninguna maquinaria como herramientas de trabajo, exceptuando que se trate de profesionaes.
+
+(ii) Tamaño del establecimiento: los trabajos en establecimientos pequeños se enfrentan a una menor divi1on social y tecnica del trabajo, y a menores niveles de productividad.
+
+     Serán considerados precarios aquellos que trabajen establecimientos con menos de 5 trabajadores
+
+(iii) Descuento jubilatorio: es una variable históricamente construida para conocer las condiciones de trabajo de las personas asalariadas. 1n embargo, es consensuada como la mejor variable para identificar la condicion de precario en los asalariados. Aquellos que no cuenten con descuentos jubilatorios por el puesto de trabajo, serán considerados precarios.
+
+(iv) Trabajadores a tiempo parcial involuntario : Los trabajadores subocupados, es decir que trabajan menos de una jornada con1derada normal por razones involuntarias y que están disponibles para trabajar serán considerados trabajadores en empleos precarios.
+
+     Una vez consideradas las dimen1ones de precariedad mencionadas, construimos una variable que cuente cuantas de ellas se cumplen para determinadas actividades o grupo de personas.
 
 ```{r}
 
@@ -373,19 +376,7 @@ saveRDS(base_asalariados, "01_data/outputs_filtros/bases_precariedad.rds")
 
 ```
 
-A continuación, nos quedamos solo con la población asalariada. Y creamos las principales variables con las que evaluar la precariedad:
-
-(i) Tecnología y calificación: los trabajos precarios son trabajos de baja tecnología y baja calificación, en este caso serán con1derados precarios quienes no utilizan ninguna maquinaria como herramientas de trabajo, exceptuando que se trate de profe1onaes.
-
-(ii) Tamaño del establecimiento: los trabajos en establecimientos pequeños se enfrentan a una menor divi1on social y tecnica del trabajo, y a menores niveles de productividad.
-
-     Serán con1derados precarios aquellos que trabajen establecimientos con menos de 5 trabajadores
-
-(iii) Descuento jubilatorio: es una variable históricamente construida para conocer las condiciones de trabajo de las personas asalariadas. 1n embargo, es consensuada como la mejor variable para identificar la condicion de precario en los asalariados. Aquellos que no cuenten con descuentos jubilatorios por el puesto de trabajo, serán con1derados precarios.
-
-(iv) Trabajadores a tiempo parcial involuntario : Los trabajadores subocupados, es decir que trabajan menos de una jornada con1derada normal por razones involuntarias y que están disponibles para trabajar serán con1derados trabajadores en empleos precarios.
-
-     Una vez con1deradas las dimen1ones de precariedad mencionadas, construimos una variable que cuente cuantas de ellas se cumplen para determinadas actividades o grupo de personas.
+A
 
 ```{r echo=TRUE}
 # Cargar base de asalariados
