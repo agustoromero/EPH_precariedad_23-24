@@ -62,10 +62,7 @@ ggplot(c.1.2_grafico, aes(x = anio_trim, y = Proporcion, fill = Sexo)) +
 
 
 
-library(shiny)
-library(ggplot2)
-library(plotly)
-library(dplyr)
+
 # Cargar los datos consolidados
 data <- c.3_consolidado %>%
   filter(tamanio.establec.nueva != "Total", caes_seccion_label != "Total") %>%
@@ -120,3 +117,177 @@ server <- function(input, output) {
 
 # Ejecutar la app
 shinyApp(ui, server)
+
+
+
+
+# UI del dashboard
+ui <- fluidPage(
+  titlePanel("Proporciones de Precariedad Laboral"),
+  sidebarLayout(
+    sidebarPanel(
+      selectInput("sexo", "Seleccionar Sexo:",
+                  choices = unique(c.6_signos_preca_consolidado$Sexo),
+                  selected = "Ambos")
+    ),
+    mainPanel(
+      plotOutput("precariedadPlot")
+    )
+  )
+)
+
+# Server del dashboard
+server <- function(input, output) {
+  output$precariedadPlot <- renderPlot({
+    df <- c.6_signos_preca_consolidado %>%
+      filter(Sexo == input$sexo) %>%
+      select(anio_trim, Prop_Signo1, Prop_Signo2, Prop_Signo3, Prop_Almenos1de3) %>%
+      pivot_longer(-anio_trim, names_to = "Indicador", values_to = "Proporcion")
+    
+    ggplot(df, aes(x = factor(anio_trim), y = Proporcion, fill = Indicador)) +
+      geom_bar(stat = "identity", position = "dodge") +
+      geom_text(aes(label = paste0(Proporcion, "%")), position = position_dodge(width = 0.9), vjust = -0.5) +
+      labs(title = "Proporciones de Precariedad Laboral", y = "Proporción (%)", x = "Trimestre", fill = "Indicador") +
+      theme_minimal()
+  })
+}
+
+# Ejecutar la aplicación
+shinyApp(ui = ui, server = server)
+
+# # Cargar los datos consolidados
+# data <- c.4_consolidado %>%
+#   filter(tamanio.establec.nueva != "Total", nivel.ed1 != "Total") %>%
+#   mutate(
+#     Prop_Varones = as.numeric(Prop_Varones),
+#     Prop_Mujeres = as.numeric(Prop_Mujeres)
+#   ) %>%
+#   replace_na(list(Prop_Varones = 0, Prop_Mujeres = 0))
+# 
+# # UI
+# ui <- fluidPage(
+#   titlePanel("Distribución de Asalariados por Nivel Educativo y Tamaño del Establecimiento"),
+#   sidebarLayout(
+#     sidebarPanel(
+#       selectInput("nivel_ed", "Seleccionar Nivel Educativo:", choices = unique(data$nivel.ed1)),
+#       selectInput("tamanio", "Seleccionar Tamaño del Establecimiento:", choices = unique(data$tamanio.establec.nueva))
+#     ),
+#     mainPanel(
+#       plotlyOutput("grafico_prop")
+#     )
+#   )
+# )
+# 
+# # Server
+# server <- function(input, output) {
+#   datos_filtrados <- reactive({
+#     data %>%
+#       filter(nivel.ed1 == input$nivel_ed,
+#              tamanio.establec.nueva == input$tamanio)
+#   })
+#   
+#   output$grafico_prop <- renderPlotly({
+#     datos <- datos_filtrados()
+#     
+#     p <- ggplot(datos, aes(x = anio_trim, group = interaction(anio_trim))) +
+#       geom_bar(aes(y = Prop_Varones, fill = "Varones"), stat = "identity", position = "dodge") +
+#       geom_bar(aes(y = Prop_Mujeres, fill = "Mujeres"), stat = "identity", position = "dodge") +
+#       geom_text(aes(y = Prop_Varones, label = ifelse(Prop_Varones > 0, scales::percent(Prop_Varones, accuracy = 0.1), "")),
+#                 vjust = -0.5, color = "black") +
+#       geom_text(aes(y = Prop_Mujeres, label = ifelse(Prop_Mujeres > 0, scales::percent(Prop_Mujeres, accuracy = 0.1), "")),
+#                 vjust = 1.5, color = "black") +
+#       scale_fill_manual(values = c("Varones" = "blue", "Mujeres" = "pink")) +
+#       facet_wrap(~nivel.ed1, scales = "fixed") +
+#       theme_minimal() +
+#       labs(title = "Proporción de Varones y Mujeres por Nivel Educativo y Trimestre",
+#            y = "Proporción",
+#            x = "Año-Trimestre")
+#     
+#     ggplotly(p)
+#   })
+# }
+# 
+# # Ejecutar la app
+# shinyApp(ui, server)
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# # Cargar los datos consolidados
+# data <- c.5_rama_cond.registro_tipo.establec_consolidado %>%
+#   filter(tipo_establecimiento != "Total")
+# 
+# # UI
+# ui <- fluidPage(
+#   titlePanel("Evolución de la Condición de Registro por Sector"),
+#   sidebarLayout(
+#     sidebarPanel(
+#       selectInput("tipo_estab", "Seleccionar Tipo de Establecimiento:", 
+#                   choices = unique(data$tipo_establecimiento)),
+#       selectizeInput("sectores", "Seleccionar Sectores:", 
+#                      choices = unique(data$caes_seccion_label), multiple = TRUE)
+#     ),
+#     mainPanel(
+#       uiOutput("graficos_ui")
+#     )
+#   )
+# )
+# 
+# # Server
+# server <- function(input, output) {
+#   datos_filtrados <- reactive({
+#     df <- data %>% filter(tipo_establecimiento == input$tipo_estab)
+#     if (!is.null(input$sectores) && length(input$sectores) > 0) {
+#       df <- df %>% filter(caes_seccion_label %in% input$sectores)
+#     }
+#     df
+#   })
+#   
+#   output$graficos_ui <- renderUI({
+#     datos <- datos_filtrados()
+#     sectores_seleccionados <- unique(datos$caes_seccion_label)
+#     req(sectores_seleccionados)
+#     
+#     plot_output_list <- lapply(sectores_seleccionados, function(sector) {
+#       plotlyOutput(outputId = paste0("grafico_", gsub(" ", "_", sector)))
+#     })
+#     
+#     do.call(tagList, plot_output_list)
+#   })
+#   
+#   observe({
+#     datos <- datos_filtrados()
+#     sectores_seleccionados <- unique(datos$caes_seccion_label)
+#     
+#     lapply(sectores_seleccionados, function(sector) {
+#       output[[paste0("grafico_", gsub(" ", "_", sector))]] <- renderPlotly({
+#         datos_sector <- datos %>% filter(caes_seccion_label == sector)
+#         
+#         p <- ggplot(datos_sector, aes(x = anio_trim)) +
+#           geom_line(aes(y = part_asal_prote, color = "Protegidos"), size = 1) +
+#           geom_line(aes(y = part_asal_precarios, color = "Precarios"), size = 1) +
+#           geom_line(aes(y = part_mono_en_precarios, color = "Mono en Precarios"), size = 1) +
+#           geom_line(aes(y = part_negro_en_precarios, color = "Negro en Precarios"), size = 1) +
+#           geom_line(aes(y = part_NSNR_en_precarios, color = "NSNR en Precarios"), size = 1) +
+#           scale_y_continuous(labels = scales::percent) +
+#           scale_color_manual(values = c("Protegidos" = "blue", "Precarios" = "red", 
+#                                         "Mono en Precarios" = "orange", "Negro en Precarios" = "purple", 
+#                                         "NSNR en Precarios" = "green")) +
+#           theme_minimal() +
+#           labs(title = paste("Evolución de la Condición de Registro -", sector),
+#                y = "Proporción", x = "Año-Trimestre", color = "Condición")
+#         
+#         ggplotly(p)
+#       })
+#     })
+#   })
+# }
+# 
+# # Ejecutar la app
+# shinyApp(ui, server)
+
+

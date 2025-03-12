@@ -14,10 +14,29 @@
   # Definir los trimestres de interés (3T 2023 hasta 2T 2024)
   trimestres_seleccionados <- expand.grid(
     ANO4 = 2023:2024, 
-    TRIMESTRE = 1:4
-  ) %>%
-    filter(!(ANO4 == 2023 & TRIMESTRE < 3),  # Excluir antes del 3T 2023
-           !(ANO4 == 2024 & TRIMESTRE > 2))  # Excluir después del 2T 2024
+    TRIMESTRE = 3
+  ) #%>%
+    #filter(!(ANO4 == 2023 & TRIMESTRE < 3),  # Excluir antes del 3T 2023
+    #      !(ANO4 == 2024 & TRIMESTRE > 3))  # Excluir después del 3T 2024
+  
+  
+  
+  # Verificar si el archivo RDS del 3T 2024 existe
+  archivo_rds_2024T3 <- "01_data/base_2024_T3.rds"
+  archivo_txt_2024T3 <- "01_data/base_2024_T3.txt"
+  
+  if (!file.exists(archivo_rds_2024T3) && file.exists(archivo_txt_2024T3)) {
+    # Leer el TXT (ajusta según el formato)
+    datos_2024_T3 <- read.delim(archivo_txt_2024T3, sep = ";", header = TRUE) %>%
+      mutate(ANO4 = 2024, TRIMESTRE = 3, anio_trim = "2024T3")
+    
+    # Guardar en formato RDS para futuras cargas
+    saveRDS(datos_2024_T3, archivo_rds_2024T3)
+    
+    message("Cargado desde TXT y guardado como RDS: ", archivo_rds_2024T3)
+  }
+  
+  
   
   # Función para descargar y guardar datos en RDS #### 
 # Tiltie esta parte para no repetir con las lineas 40--52
@@ -171,7 +190,7 @@ base_asalariados <- base_asalariados %>%
     # Signo de precariedad tecnológica y de calificación
     preca_tecno_calif = case_when(
       TECNOLOGIA == 1 & CALIFICACION == 1 ~ 4,  # Solo cuando ambos son 1
-      <TRUE ~ 0 ),
+      TRUE ~ 0 ),
     
     # Clasificación de educación
     nivel.ed = factor(case_when(
@@ -253,11 +272,16 @@ calcular_poblacion_estado <- function(df) {
 }
 
 # Definir los trimestres de interés usando el formato "YYYYTn" deseado
+# trimestres <- list(
+#   "2023_3" = filtrar_por_trimestre(base, "2023", 3),
+#   "2023_4" = filtrar_por_trimestre(base, "2023", 4),
+#   "2024_1" = filtrar_por_trimestre(base, "2024", 1),
+#   "2024_2" = filtrar_por_trimestre(base, "2024", 2)
+# )
+
 trimestres <- list(
   "2023_3" = filtrar_por_trimestre(base, "2023", 3),
-  "2023_4" = filtrar_por_trimestre(base, "2023", 4),
-  "2024_1" = filtrar_por_trimestre(base, "2024", 1),
-  "2024_2" = filtrar_por_trimestre(base, "2024", 2)
+  "2024_3" = filtrar_por_trimestre(base, "2024", 3)
 )
 
 # Aplicar la función a cada trimestre y consolidar los resultados
@@ -525,10 +549,10 @@ cuadro_precariedad_trimestral <- function(df) {
       Signo3_Varones = sum(PONDERA[CH04 == 1 & signo_tiempo == 1], na.rm = TRUE),
       Signo3_Mujeres = sum(PONDERA[CH04 == 2 & signo_tiempo == 1], na.rm = TRUE),
       
-      Signo4_Ambos  = sum(PONDERA[signo_tecno_calif == 1], na.rm = TRUE),
-      Signo4_Varones = sum(PONDERA[CH04 == 1 & signo_tecno_calif == 1], na.rm = TRUE),
-      Signo4_Mujeres = sum(PONDERA[CH04 == 2 & signo_tecno_calif == 1], na.rm = TRUE),
-      
+      # Signo4_Ambos  = sum(PONDERA[signo_tecno_calif == 1], na.rm = TRUE),
+      # Signo4_Varones = sum(PONDERA[CH04 == 1 & signo_tecno_calif == 1], na.rm = TRUE),
+      # Signo4_Mujeres = sum(PONDERA[CH04 == 2 & signo_tecno_calif == 1], na.rm = TRUE),
+      # 
       Almenos1de3_Ambos = sum(PONDERA[almenos1de3 == 1], na.rm = TRUE),
       Almenos1de3_Varones = sum(PONDERA[CH04 == 1 & almenos1de3 == 1], na.rm = TRUE),
       Almenos1de3_Mujeres = sum(PONDERA[CH04 == 2 & almenos1de3 == 1], na.rm = TRUE),
@@ -547,7 +571,10 @@ cuadro_precariedad_trimestral <- function(df) {
     mutate(Indicador = str_remove(Categoria, "_(Ambos|Varones|Mujeres)$")) %>%
     select(anio_trim, Sexo, Indicador, Frecuencia) %>%
     pivot_wider(names_from = Indicador, values_from = Frecuencia) %>%
-    mutate(Proporcion = round(Almenos1de3 / Total * 100, 2)) %>%
+    mutate(Prop_Signo1 = round(Signo1 / Total * 100, 2),
+           Prop_Signo2 = round(Signo2 / Total * 100, 2),
+           Prop_Signo3 = round(Signo3 / Total * 100, 2),
+           Prop_Almenos1de3 = round(Almenos1de3 / Total * 100, 2)) %>%
     rename(Poblacion = Total)
   
   return(cuadro_base)
