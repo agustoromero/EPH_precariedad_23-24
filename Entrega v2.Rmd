@@ -98,17 +98,12 @@ base <- readRDS("01_data/input_original/bases_originales.rds")
 base <- base %>%
   mutate(
     rango_etario = case_when(
-      CH06 < 19  ~ "Menor a 19",
-      CH06 >= 19 & CH06 <= 25 ~ "19 a 25",
-      CH06 >= 26 & CH06 <= 35 ~ "26 a 35",
-      CH06 >= 36 & CH06 <= 45 ~ "36 a 45",
-      CH06 >= 46 & CH06 <= 55 ~ "46 a 55",
-      CH06 >= 56 & CH06 <= 65 ~ "56 a 65",
-      CH06 >= 66 & CH06 <= 75 ~ "66 a 75",
-      CH06 >= 76 & CH06 <= 85 ~ "76 a 85",
-      CH06 > 85  ~ "Mayor a 85",
-      TRUE ~ NA_character_
-    ),
+    CH06 < 19  ~ "Menor a 19",
+    CH06 >= 19 & CH06 <= 30 ~ "Jovenes (de 19 a 30 años)",
+      CH06 >= 31 & CH06 <= 45 ~ "adultos (de 31 a 45)",
+      CH06 >= 46 & CH06 <= 60 ~ "adultos 2 (de 46 a 60)",
+      CH06 >= 61  ~ "mayores de 60",
+      TRUE ~ NA_character_    ),
     nivel.ed1 = factor(case_when(
       NIVEL_ED %in% c(7,1,2,3) ~ "Menor a Secundaria", 
       NIVEL_ED %in% 4 ~ "Secundaria Completa",
@@ -227,7 +222,9 @@ A continuación, nos quedamos solo con la población asalariada. Y creamos las p
 
 (iv) Trabajadores a tiempo parcial involuntario : Los trabajadores subocupados, es decir que trabajan menos de una jornada con1derada normal por razones involuntarias y que están disponibles para trabajar serán considerados trabajadores en empleos precarios.
 
-     Una vez consideradas las dimen1ones de precariedad mencionadas, construimos una variable que cuente cuantas de ellas se cumplen para determinadas actividades o grupo de personas.
+(v) Trabajadores con empleos con finalización: trabajadores que declaran que su trabajo tiene periodo de finalización.
+
+    Una vez consideradas las dimen1ones de precariedad mencionadas, construimos una variable que cuente cuantas de ellas se cumplen para determinadas actividades o grupo de personas.
 
 ```{r echo=TRUE}
 # Cargar base de asalariados
@@ -263,8 +260,8 @@ base_asalariados <- base_asalariados %>%
     part.time.inv = case_when(PP3E_TOT < 35 & PP03G == 1 ~ "Si", TRUE ~ "No"),
     tiempo.determinado = case_when(PP07C == 1 ~ "Si", TRUE ~ "No"),
     Signo_educ_tamaño = as.integer(nivel.ed == "Menor a Secundaria" & tamanio.establec == "peque"),  # 1er 1gno
-    Signo_1ndescuento = as.integer(descuento_jubil == "No"),  # 2do 1gno
-    Signo_tiempo = as.integer(part.time.inv == "Si" & tiempo.determinado == "Si"),  # 3er 1gno
+    Signo_sindescuento = as.integer(descuento_jubil == "No"),  # 2do 1gno
+    Signo_tiempo = as.integer(part.time.inv == "Si" | tiempo.determinado == "Si"),  # 3er 1gno
     # 1gno_tecno_calif = as.integer(preca_tecno_calif == 4),  # 4to 1gno
     total_precario = Signo_educ_tamaño + Signo_1ndescuento + Signo_tiempo 
     # + 1gno_tecno_calif)
@@ -276,6 +273,41 @@ saveRDS (base_asalariados, "01_data/outputs_filtros/bases_precariedad.rds")
 ```
 
 Por problemas con la variable que vincula calificación y tecnología del puesto de trabajo con la precariedad("Tecnología y calificación" o "preca_tecno_calif"), utilizaremos nivel educativo y tamaño. Intentaremos resolver en próximas experiencias.
+
+# Precariedad según nivel educativo
+
+```{r}
+#Entrada
+C._preca.nivel.ed <- base_asalariados %>%
+  group_by(ANO4, nivel.ed1) %>%  
+  summarise(
+    Poblacion_Ambos = sum(PONDERA),
+    Poblacion_precaria = sum(PONDERA[descuento_jubil == "No"]),   .groups = "drop"
+  ) %>%
+  mutate(
+    'Prop. precarios' = Poblacion_precaria / Poblacion_Ambos
+  )
+#orden
+data_ano1 <- C._preca.nivel.ed %>%
+  filter(ANO4 == 2023) %>%
+  select(-ANO4) %>%
+  rename(Prop_precarios_2023 = `Prop. precarios`)
+
+data_ano2 <- C._preca.nivel.ed %>%
+  filter(ANO4 == 2024) %>%
+  select(-ANO4) %>%
+  rename(Prop_precarios_2024 = `Prop. precarios`)
+#Salida
+C._preca.nivel.ed <- left_join(data_ano1, data_ano2, by = "nivel.ed1") %>%  mutate(
+    Prop_precarios_2023 = round(Prop_precarios_2023 * 100, 1),
+    Prop_precarios_2024 = round(Prop_precarios_2024 * 100, 1),
+    Diferencia = round((Prop_precarios_2024 - Prop_precarios_2023), 1)
+  ) %>%
+  select(nivel.ed1, Prop_precarios_2023, Prop_precarios_2024, Diferencia)  # Solo las columnas necesarias
+
+  
+print(C._preca.nivel.ed)
+```
 
 # Precariedad según sexo
 
@@ -321,4 +353,47 @@ cambio_precariedad_sexo <- left_join(data_ano1, data_ano2, by = "CH04") %>%
 
   
 print(cambio_precariedad_sexo)
+```
+
+(introducir analisis: las mujeres son mas rpecarias y en el año de milei estan peor).
+
+## Precariedad Multidimensional
+
+Ahora bien para evaluar cual es el mejor indicador de estos a la hora de identificar la situación de precariedad construimos un cuadro que cruce las distintas dimensiones con una variable que funciona como "intensidad de la precariedad" dónde cada personas es mas precaria según cuantas dimensiones de precariedad se le haya encontrado.
+
+```{r}
+C._preca.total <- base_asalariados %>%
+  group_by(ANO4, total_precario) %>%
+  summarise(
+    Total = sum(PONDERA),
+    sindescuento = sum(PONDERA[descuento_jubil == "No"]),
+    trabajo.confinalizacion = sum(PONDERA[tiempo.determinado=="Si"]),
+    Part.time.involuntario = sum(PONDERA[part.time.inv=="Si"]),
+    a.tiempo.det = sum(PONDERA[tiempo.determinado=="Si"]),
+    .groups = "drop"
+  )
+# %>%
+  mutate(
+    'Prop. precarios' = Poblacion_precaria / Poblacion_Ambos
+  )
+```
+
+```{r}
+C._preca.total_pct <- base_asalariados %>%
+  group_by(ANO4, total_precario) %>%
+  summarise(
+    Total = sum(PONDERA),
+    Sindescuento = sum(PONDERA[descuento_jubil == "No"]),
+    Trabajo_confinalizacion = sum(PONDERA[tiempo.determinado == "Si"]),
+    Part_time_involuntario = sum(PONDERA[part.time.inv == "Si"]),
+    A_tiempo_det = sum(PONDERA[tiempo.determinado == "Si"]),
+    .groups = "drop"
+  ) %>%
+  mutate(
+    Sindescuento = round(Sindescuento / Total * 100, 1),
+    Trabajo_confinalizacion = round(Trabajo_confinalizacion / Total * 100, 1),
+    Part_time_involuntario = round(Part_time_involuntario / Total * 100, 1),
+    A_tiempo_det = round(A_tiempo_det / Total * 100, 1)
+  ) %>%
+  select(-Total)  # Eliminar la columna Total si ya no es necesaria
 ```
