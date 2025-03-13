@@ -15,7 +15,7 @@ output:
 
 # Intro
 
-Objetivo: Nos interesaexplorar los principales cambios en el Mercado de Trabajo a raíz del nuevo gobierno como guía para explorar las herramientas.
+Objetivo: Nos interesa explorar los principales cambios en el Mercado de Trabajo a raíz del nuevo gobierno como guía para explorar las herramientas.
 
 Para trabajar en el entorno compartido de github configuarmos una carpeta de origen de la información (*El pescado*), una carpeta con los Scripts (*El cuchillo*) y una carpeta con los resultados (*Las tripas*).
 
@@ -24,6 +24,8 @@ Como la idea era poder aplicarlo de manera repetida para los distintos trimestre
 # Primeros cambios en la base
 
 Construimos un entorno de trabajo y una funcion para descargar la información para luego descargar las y juntarlas, ya listas para trabajar y transformar toda junta.
+
+Como este procesamiento fue pensado para construir series y cuadros que puedan replicarse para todas las bases de interés, definidas con anterioridad, construimos la gran mayoria de cuadros y tablas a partir de funciones.
 
 ```{r echo=TRUE, message=FALSE, warning=FALSE}
 #Librerías
@@ -155,11 +157,13 @@ base <- base %>%
     filter(ESTADO == 1, CAT_OCUP == 3) %>%
     group_by(tamanio.establec_original) %>%
     summarise(
- uni= sum(PONDERA[PP04C==1]),
- peque= sum(PONDERA[PP04C %in% 2:5| (PP04C==99 & PP04C99==1)]),
+    unipersonal = sum(PONDERA[PP04C==1]),
+    peque = sum(PONDERA[PP04C %in% 2:5| (PP04C==99 & PP04C99==1)]),
     mediano = sum(PONDERA[PP04C %in% 6:8| (PP04C==99 & PP04C99==2)]),
-    grande = sum(PONDERA[PP04C %in% 9:12| (PP04C==99 & PP04C99==3)])
+    grande = sum(PONDERA[PP04C %in% 9:12| (PP04C==99 & PP04C99==3)]),
+    Trabajadora.domestica= sum (PONDERA [PP04B1==1])
     )
+    
   
 write.xlsx (file = "C:/Users/Hache/Documents/GitHub/EPH_precariedad_23-24/cuadros/cuadro_anexo_tamanioestablecimiento.",  cuadro_anexo1)
 
@@ -208,8 +212,6 @@ saveRDS(base_ocupados, "01_data/outputs_filtros/bases_ocupados.rds")
 
 saveRDS(base_asalariados, "01_data/outputs_filtros/bases_asalariados.rds")
 ```
-
-Como este procesamiento fue pensado para construir series y cuadros que puedan replicarse para todas las bases de interés, definidas con anterioridad, construimos la gran mayoria de cuadros y tablas a partir de funciones, como se presenta en el siguiente chunk.
 
 ## Modificaciones para asalariados
 
@@ -277,135 +279,46 @@ Por problemas con la variable que vincula calificación y tecnología del puesto
 
 # Precariedad según sexo
 
-Intentando explicar las diferencias en el nivel de precariedad entre varones y mujeres con un cuadro por trimestre y las diferencias.
-
-```{r}
-
-# Agregar la variable ANO4 a la base antes de agrupar
-C._preca.intensi_sexo_part_ano <- base_asalariados %>%
-  group_by(ANO4, descuento_jubil) %>%
-  summarise(
-    Poblacion_Ambos = sum(PONDERA),
-    Poblacion_Varones = sum(PONDERA[CH04 == 1]),
-    Poblacion_Mujeres = sum(PONDERA[CH04 == 2]),
-    .groups = "drop"
-  ) %>%
-  mutate(
-    'Prop. varones' = Poblacion_Varones / Poblacion_Ambos,
-    'Prop. mujeres' = Poblacion_Mujeres / Poblacion_Ambos,
-    'Part. Ambos (%)' = 100 * Poblacion_Ambos / sum(Poblacion_Ambos),
-    'Part. Varones (%)' = 100 * Poblacion_Varones / sum(Poblacion_Varones),
-    'Part. Mujeres (%)' = 100 * Poblacion_Mujeres / sum(Poblacion_Mujeres)
-  )
-
-# Separar los datos por año
-data_ano1 <- C._preca.intensi_sexo_part_ano %>% filter(ANO4 == 2023) %>% select(-ANO4)
-data_ano2 <- C._preca.intensi_sexo_part_ano %>% filter(ANO4 == 2024) %>% select(-ANO4)
-
-# Unir los datos por total_precario
-c.comparacion_preca_sexo <- left_join(data_ano1, data_ano2, by = "total_precario", suffix = c("_2023", "_2024"))
-
-# Calcular diferencias por fila (2024 - 2023)
-c.comparacion_preca_sexo<- c.comparacion_preca_sexo %>%
-  mutate(across(starts_with("Poblacion_") | starts_with("Prop.") | starts_with("Part."),
-                ~ .[[2]] - .[[1]], 
-                .names = "Diferencia_{.col}"))
-
-# Ver resultado
-print(c.comparacion_preca_sexo)
-```
-
-```{r message=TRUE, warning=FALSE, paged.print=TRUE}
-#1 2023
-C.prueba_sexo_preca <- base_asalariados %>% filter(ANO4==2023 )%>% group_by(descuento_jubil) %>% summarise(
-      Poblacion_Ambos = sum(PONDERA),
-      Poblacion_Varones = sum(PONDERA[CH04 == 1]),
-      Poblacion_Mujeres = sum(PONDERA[CH04 == 2]),
-      .groups = "drop",
-      'Prop. varones' = Poblacion_Varones / Poblacion_Ambos,
-      'Prop. mujeres' = Poblacion_Mujeres / Poblacion_Ambos
-    ) %>%
-  mutate(
-    'Prop. varones' = Poblacion_Varones / Poblacion_Ambos,
-    'Prop. mujeres' = Poblacion_Mujeres / Poblacion_Ambos
-  )
-
-C._preca.intensi_sexo_part <- C.prueba_sexo_preca %>%
-  mutate(
-    'Part. Ambos (%)' = 100 * Poblacion_Ambos / sum(Poblacion_Ambos),
-    'Part. Varones (%)' = 100 * Poblacion_Varones / sum(Poblacion_Varones),
-    'Part. Mujeres (%)' = 100 * Poblacion_Mujeres / sum(Poblacion_Mujeres)
-  ) %>% select(-c(Poblacion_Ambos,Poblacion_Varones,Poblacion_Mujeres,`Prop. mujeres`,`Prop. varones`))
-print(C._preca.intensi_sexo_part)
-
-```
-
-#Proporción de precarios según sexo.
+Intentando explicar las diferencias en el nivel de precariedad entre varones y mujeres con un cuadro por trimestre y las diferencias.#Proporción de precarios según sexo.
 
 Trabajo la información en trimestres
 
 #este de aca se me fue a la mierda. pero la idea esta. Creo que se podría hacer un dashboard con algo de esto. ¿no? (llamada)
 
-```{#2}
-C._preca.intensi_sexo <- base_asalariados %>%
-  group_by(total_precario) %>%
+\|
+
+```{r message=TRUE, paged.print=TRUE}
+#Entrada
+C._preca.sexo_part_ano <- base_asalariados %>%
+  group_by(ANO4, CH04) %>%
   summarise(
     Poblacion_Ambos = sum(PONDERA),
-    Poblacion_Varones = sum(PONDERA[CH04 == 1]),
-    Poblacion_Mujeres = sum(PONDERA[CH04 == 2]),
+    Poblacion_precaria = sum(PONDERA[descuento_jubil == "No"]),
     .groups = "drop"
   ) %>%
   mutate(
-    'Prop. varones' = Poblacion_Varones / Poblacion_Ambos,
-    'Prop. mujeres' = Poblacion_Mujeres / Poblacion_Ambos
+    'Prop. precarios' = Poblacion_precaria / Poblacion_Ambos
   )
+#orden
+data_ano1 <- C._preca.sexo_part_ano %>%
+  filter(ANO4 == 2023) %>%
+  select(-ANO4) %>%
+  rename(Prop_precarios_2023 = `Prop. precarios`)
 
-# **Cuadro con participación (%) por columna**
-C._preca.intensi_sexo_part <- C._preca.intensi_sexo %>%
+data_ano2 <- C._preca.sexo_part_ano %>%
+  filter(ANO4 == 2024) %>%
+  select(-ANO4) %>%
+  rename(Prop_precarios_2024 = `Prop. precarios`)
+#Salida
+cambio_precariedad_sexo <- left_join(data_ano1, data_ano2, by = "CH04") %>%
   mutate(
-    'Part. Ambos (%)' = 100 * Poblacion_Ambos / sum(Poblacion_Ambos),
-    'Part. Varones (%)' = 100 * Poblacion_Varones / sum(Poblacion_Varones),
-    'Part. Mujeres (%)' = 100 * Poblacion_Mujeres / sum(Poblacion_Mujeres)
-  )
-#4
-cuadro_precariedad_ambos_trimestral <- function(df) {
-  indicadores <- df %>%
-    group_by(TRIMESTRE) %>%
-    summarise(
-      Total = n(),
-      "Signo 1: Educación-Tamaño" = sum(Signo_educ_tamaño, na.rm = TRUE),
-      "Signo 2: Sin Descuento Jubilatorio" = sum(Signo_Sindescuento, na.rm = TRUE),
-      "Signo 3: Tiempo (PT involuntario + Indeterminado)" = sum(Signo_tiempo, na.rm = TRUE),
-      # "Signo 4: Tecnología-Calificación" = sum(Signo_tecno_calif, na.rm = TRUE),
-      "Total con al menos 1 de 3" = sum(almenos1de3, na.rm = TRUE),
-      "Total Sin Signos de precariedad" = sum(Sin_preca_de3, na.rm = TRUE),
-      .groups = "drop"
-    ) %>%
-    pivot_longer(cols = -c(Total, TRIMESTRE), names_to = "Indicador", values_to = "Frecuencia_ambos") %>%
-    mutate(Proporcion_ambos = round(Frecuencia_ambos / Total * 100, 2)) %>%
-    pivot_wider(names_from = TRIMESTRE, values_from = c(Frecuencia_ambos, Proporcion_ambos))
-  
-  return(indicadores)
-}
+    Sexo = ifelse(CH04 == 1, "Varón", "Mujer"),
+    Prop_precarios_2023 = round(Prop_precarios_2023 * 100, 1),
+    Prop_precarios_2024 = round(Prop_precarios_2024 * 100, 1),
+    Diferencia = round((Prop_precarios_2024 - Prop_precarios_2023), 1)
+  ) %>%
+  select(Sexo, Prop_precarios_2023, Prop_precarios_2024, Diferencia)  # Solo las columnas necesarias
 
-cuadro_precariedad_sexo_trimestral <- function(df) {
-  indicadores <- df %>%
-    group_by(TRIMESTRE, CH04) %>%  # CH04 es la columna de sexo
-    summarise(
-      Total = n(),
-      "Signo 1: Educación-Tamaño" = sum(Signo_educ_tamaño, na.rm = TRUE),
-      "Signo 2: Sin Descuento Jubilatorio" = sum(Signo_Sindescuento, na.rm = TRUE),
-      "Signo 3: Tiempo (PT involuntario + Indeterminado)" = sum(Signo_tiempo, na.rm = TRUE),
-      # "1gno 4: Tecnología-Calificación" = sum(1gno_tecno_calif, na.rm = TRUE),
-      "Total con al menos 1 de 3" = sum(almenos1de3, na.rm = TRUE),
-      "Total Sin Signos de precariedad" = sum(Sin_preca_de3, na.rm = TRUE),
-      .groups = "drop"
-    ) %>%
-    pivot_longer(cols = -c(Total, CH04, TRIMESTRE), names_to = "Indicador", values_to = "Frecuencia") %>%
-    mutate(Proporcion = round(Frecuencia / Total * 100, 2)) %>%
-    pivot_wider(names_from = c(TRIMESTRE, CH04), values_from = c(Frecuencia, Proporcion)) 
   
-  return(indicadores)
-}
-
+print(cambio_precariedad_sexo)
 ```
