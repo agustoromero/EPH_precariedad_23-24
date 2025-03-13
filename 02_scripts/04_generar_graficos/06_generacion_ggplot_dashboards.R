@@ -291,15 +291,20 @@ shinyApp(ui = ui, server = server)
 library(plotly)
 library(dplyr)
 
+# Suponemos que c.91_precaSS_educ_sexo_final ya tiene la columna anio_trim
+# (extraída previamente de `anio_trim/nivel.ed1`)
+# Aseguramos el orden deseado:
+sexos <- c("Varón", "Mujer", "Ambos")
+
 # Función para escalar tamaños (evita tamaños desproporcionados)
 escala_puntos <- function(valores) {
-  5 + sqrt(valores) * 9  # Ajusta estos valores si es necesario
+  5 + sqrt(valores) * 9  # Puedes ajustar estos valores si es necesario
 }
 
-# Crear gráfico interactivo
+# Crear gráfico interactivo con configuración inicial
 fig <- plot_ly() %>%
   layout(
-    title = "Proporción de Niveles Educativos por Sexo y Trimestre",
+    title = "Proporción de Niveles Educativos - Varón",
     xaxis = list(title = "Trimestre"),
     yaxis = list(
       title = "Nivel Educativo",
@@ -312,87 +317,102 @@ fig <- plot_ly() %>%
         type = "dropdown",
         active = 0,
         buttons = list(
-          list(method = "update", 
-               args = list(list(visible = c(TRUE, TRUE, TRUE, TRUE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE))), 
-               label = "Varón"),
-          list(method = "update", 
-               args = list(list(visible = c(FALSE, FALSE, FALSE, FALSE, TRUE, TRUE, TRUE, TRUE, FALSE, FALSE, FALSE, FALSE))), 
-               label = "Mujer"),
-          list(method = "update", 
-               args = list(list(visible = c(FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, TRUE, TRUE, TRUE, TRUE))), 
-               label = "Ambos")
+          # Botón para Varón: primeras 4 trazas visibles
+          list(
+            method = "update", 
+            args = list(
+              list(visible = c(TRUE, TRUE, TRUE, TRUE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE)),
+              list(title = "Proporción de Niveles Educativos - Varón")
+            ),
+            label = "Varón"
+          ),
+          # Botón para Mujer: trazas 5 a 8 visibles
+          list(
+            method = "update", 
+            args = list(
+              list(visible = c(FALSE, FALSE, FALSE, FALSE, TRUE, TRUE, TRUE, TRUE, FALSE, FALSE, FALSE, FALSE)),
+              list(title = "Proporción de Niveles Educativos - Mujer")
+            ),
+            label = "Mujer"
+          ),
+          # Botón para Ambos: últimas 4 trazas visibles
+          list(
+            method = "update", 
+            args = list(
+              list(visible = c(FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, TRUE, TRUE, TRUE, TRUE)),
+              list(title = "Proporción de Niveles Educativos - Ambos")
+            ),
+            label = "Ambos"
+          )
         )
       )
     )
   )
 
-# Obtener valores únicos de "sexo"
-sexos <- unique(c.91_precaSS_educ_sexo_final$sexo)
-
-# Agregar trazas por nivel educativo
+# Agregar trazas para cada grupo, en el orden deseado
 for (sexo in sexos) {
   datos_filtrados <- c.91_precaSS_educ_sexo_final %>%
     filter(sexo == !!sexo)
   
-  # Definir color según sexo
+  # Asignar color según sexo
   color <- case_when(
     sexo == "Varón" ~ "blue",
     sexo == "Mujer" ~ "red",
-    sexo == "Ambos" ~ "black"
+    sexo == "Ambos" ~ "grey"
   )
   
-  # Visible por defecto solo "Varón"
-  visible <- (sexo == "Varón")
+  # Solo las trazas para Varón se muestran por defecto
+  visible_flag <- ifelse(sexo == "Varón", TRUE, FALSE)
   
-  # Agregar trazas con tamaños bien proporcionados
+  # Se agregan 4 trazas para cada grupo (una para cada nivel educativo)
   fig <- fig %>%
     add_trace(
       data = datos_filtrados,
-      x = ~anio_trim,
-      y = ~"Menor a Secundaria",
+      x = ~ anio_trim,
+      y = ~ "Menor a Secundaria",
       type = 'scatter',
       mode = 'markers+text',
-      text = ~paste0(round(`prop_Menor a Secundaria`, 1), "%"),
+      text = ~ paste0(round(`prop_Menor a Secundaria`, 1), "%"),
       textposition = "middle center",
-      marker = list(size = ~escala_puntos(`prop_Menor a Secundaria`), color = color),
+      marker = list(size = ~ escala_puntos(`prop_Menor a Secundaria`), color = color),
       name = paste("Menor a Secundaria (", sexo, ")"),
-      visible = visible
+      visible = visible_flag
     ) %>%
     add_trace(
       data = datos_filtrados,
-      x = ~anio_trim,
-      y = ~"Secundaria Completa",
+      x = ~ anio_trim,
+      y = ~ "Secundaria Completa",
       type = 'scatter',
       mode = 'markers+text',
-      text = ~paste0(round(`prop_Secundaria Completa`, 1), "%"),
+      text = ~ paste0(round(`prop_Secundaria Completa`, 1), "%"),
       textposition = "middle center",
-      marker = list(size = ~escala_puntos(`prop_Secundaria Completa`), color = color),
+      marker = list(size = ~ escala_puntos(`prop_Secundaria Completa`), color = color),
       name = paste("Secundaria Completa (", sexo, ")"),
-      visible = visible
+      visible = visible_flag
     ) %>%
     add_trace(
       data = datos_filtrados,
-      x = ~anio_trim,
-      y = ~"Superior Incompleto",
+      x = ~ anio_trim,
+      y = ~ "Superior Incompleto",
       type = 'scatter',
       mode = 'markers+text',
-      text = ~paste0(round(`prop_Superior Incompleto`, 1), "%"),
+      text = ~ paste0(round(`prop_Superior Incompleto`, 1), "%"),
       textposition = "middle center",
-      marker = list(size = ~escala_puntos(`prop_Superior Incompleto`), color = color),
+      marker = list(size = ~ escala_puntos(`prop_Superior Incompleto`), color = color),
       name = paste("Superior Incompleto (", sexo, ")"),
-      visible = visible
+      visible = visible_flag
     ) %>%
     add_trace(
       data = datos_filtrados,
-      x = ~anio_trim,
-      y = ~"Superior Completo",
+      x = ~ anio_trim,
+      y = ~ "Superior Completo",
       type = 'scatter',
       mode = 'markers+text',
-      text = ~paste0(round(`prop_Superior Completo`, 1), "%"),
+      text = ~ paste0(round(`prop_Superior Completo`, 1), "%"),
       textposition = "middle center",
-      marker = list(size = ~escala_puntos(`prop_Superior Completo`), color = color),
+      marker = list(size = ~ escala_puntos(`prop_Superior Completo`), color = color),
       name = paste("Superior Completo (", sexo, ")"),
-      visible = visible
+      visible = visible_flag
     )
 }
 
