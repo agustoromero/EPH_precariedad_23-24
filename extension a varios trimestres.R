@@ -594,54 +594,55 @@ str(c.6_signos_preca_consolidado)
 #script 09
 #script 91
 
+
+
 # Función para calcular la tabla de precariedad sin descuento por sexo, nivel educativo y trimestre
 calcular_precariedad_sexo_trimestral <- function(base) {
   
-  # Tabla para Ambos sexos, incluyendo nivel educativo
+  # Calcular tablas por sexo y nivel educativo
   tabla_preca_SS_sexo_trimestral <- calculate_tabulates(
     base = base,
     x = "anio_trim",  # Trimestre
-    y = "nivel.ed1",   # Nivel educativo
+    y = "nivel.ed1",  # Nivel educativo
     weights = "PONDERA"
   ) %>%
-    mutate(sexo = "Ambos")  # Se agrega etiqueta general para ambos sexos
+    mutate(sexo = "Ambos")
   
-  # Tabla para varones, filtrando por sexo y calculando por nivel educativo
   tabla_precaSS_educ_varon_trimestral <- base %>%
-    filter(CH04 == 1) %>%  # Filtrar para varones (CH04 == 1)
-    calculate_tabulates(
-      x = "anio_trim",  # Trimestre
-      y = "nivel.ed1",   # Nivel educativo
-      weights = "PONDERA"
-    ) %>%
+    filter(CH04 == 1) %>%
+    calculate_tabulates(x = "anio_trim", y = "nivel.ed1", weights = "PONDERA") %>%
     mutate(sexo = "Varón")
   
-  # Tabla para mujeres, filtrando por sexo y calculando por nivel educativo
   tabla_precaSS_educ_mujer_trimestral <- base %>%
-    filter(CH04 == 2) %>%  # Filtrar para mujeres (CH04 == 2)
-    calculate_tabulates(
-      x = "anio_trim",  # Trimestre
-      y = "nivel.ed1",   # Nivel educativo
-      weights = "PONDERA"
-    ) %>%
+    filter(CH04 == 2) %>%
+    calculate_tabulates(x = "anio_trim", y = "nivel.ed1", weights = "PONDERA") %>%
     mutate(sexo = "Mujer")
   
-  # Combinar las tablas
+  # Combinar tablas
   resultado_final <- bind_rows(
     tabla_preca_SS_sexo_trimestral,
     tabla_precaSS_educ_varon_trimestral,
     tabla_precaSS_educ_mujer_trimestral
   )
   
-  # Limpiar variables innecesarias
-  objetos <- c("tabla_precaSS_educ_varon_trimestral", "tabla_precaSS_educ_mujer_trimestral",
-               "tabla_preca_SS_sexo_trimestral")
-  rm(list = intersect(objetos, ls()))
+  # Seleccionar solo las columnas de niveles educativos (todas menos 'anio_trim/nivel.ed1' y 'sexo')
+  columnas_niveles <- setdiff(names(resultado_final), c("anio_trim/nivel.ed1", "sexo"))
   
-  # Eliminar columna `total` si existe
-  if ("total" %in% names(resultado_final)) {
-    resultado_final <- resultado_final %>% select(-total)
-  }
+  # Sumar los valores de cada fila en las columnas de nivel educativo
+  resultado_final <- resultado_final %>%
+    rowwise() %>%
+    mutate(total_trimestre_todos_niveles = sum(c_across(all_of(columnas_niveles)), na.rm = TRUE)) %>%
+    ungroup()
+  
+  # Calcular la proporción de cada nivel educativo sobre el total
+  resultado_final <- resultado_final %>%
+    mutate(across(all_of(columnas_niveles), ~ (. / total_trimestre_todos_niveles) * 100, .names = "prop_{.col}"))
+  
+  # Verificación: sumar todas las proporciones
+  resultado_final <- resultado_final %>%
+    rowwise() %>%
+    mutate(suma_verificacion = sum(c_across(starts_with("prop_")), na.rm = TRUE)) %>%
+    ungroup()
   
   return(resultado_final)
 }
@@ -651,24 +652,3 @@ c.91_precaSS_educ_sexo_final <- calcular_precariedad_sexo_trimestral(base_asalar
 
 # Ver el resultado final
 print(c.91_precaSS_educ_sexo_final)
-
-# calculate_tabulates <- function(base, x, y, weights) {
-#   # Validar que `x`, `y` y `weights` existan en la base
-#   if (!all(x %in% names(base))) stop("Algunas variables de 'x' no están en la base de datos.")
-#   if (!(y %in% names(base))) stop("La variable 'y' no está en la base de datos.")
-#   if (!(weights %in% names(base))) stop("La variable de ponderación no está en la base de datos.")
-#   
-#   base %>%
-#     group_by(across(all_of(x))) %>%  
-#     summarise(
-#       total = sum(!!sym(weights), na.rm = TRUE),
-#       conteo = sum(!!sym(weights) * as.numeric(!!sym(y) > 0), na.rm = TRUE),  # Asegurar binarización
-#       proporcion = conteo / total * 100,
-#       .groups = "drop"
-#     )
-# }
-
-# 
-# total = 50000 significa que los varones del trimestre 2024T1 representan 50,000 personas en la población.
-# conteo = 10000 significa que 10,000 de esas personas tienen y > 0.
-# proporcion = 20% significa que el 20% de los varones en 2024T1 tienen y > 0.

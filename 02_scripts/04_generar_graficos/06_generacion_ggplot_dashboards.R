@@ -59,10 +59,6 @@ ggplot(c.1.2_grafico, aes(x = anio_trim, y = Proporcion, fill = Sexo)) +
 
 
 
-
-
-
-
 # Cargar los datos consolidados
 data <- c.3_consolidado %>%
   filter(tamanio.establec.nueva != "Total", caes_seccion_label != "Total") %>%
@@ -291,3 +287,114 @@ shinyApp(ui = ui, server = server)
 # shinyApp(ui, server)
 
 
+#grafico precariedad sin descuento
+library(plotly)
+library(dplyr)
+
+# Función para escalar tamaños (evita tamaños desproporcionados)
+escala_puntos <- function(valores) {
+  5 + sqrt(valores) * 9  # Ajusta estos valores si es necesario
+}
+
+# Crear gráfico interactivo
+fig <- plot_ly() %>%
+  layout(
+    title = "Proporción de Niveles Educativos por Sexo y Trimestre",
+    xaxis = list(title = "Trimestre"),
+    yaxis = list(
+      title = "Nivel Educativo",
+      categoryorder = "array",
+      categoryarray = c("Menor a Secundaria", "Secundaria Completa", "Superior Incompleto", "Superior Completo"),
+      autorange = TRUE
+    ),
+    updatemenus = list(
+      list(
+        type = "dropdown",
+        active = 0,
+        buttons = list(
+          list(method = "update", 
+               args = list(list(visible = c(TRUE, TRUE, TRUE, TRUE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE))), 
+               label = "Varón"),
+          list(method = "update", 
+               args = list(list(visible = c(FALSE, FALSE, FALSE, FALSE, TRUE, TRUE, TRUE, TRUE, FALSE, FALSE, FALSE, FALSE))), 
+               label = "Mujer"),
+          list(method = "update", 
+               args = list(list(visible = c(FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, TRUE, TRUE, TRUE, TRUE))), 
+               label = "Ambos")
+        )
+      )
+    )
+  )
+
+# Obtener valores únicos de "sexo"
+sexos <- unique(c.91_precaSS_educ_sexo_final$sexo)
+
+# Agregar trazas por nivel educativo
+for (sexo in sexos) {
+  datos_filtrados <- c.91_precaSS_educ_sexo_final %>%
+    filter(sexo == !!sexo)
+  
+  # Definir color según sexo
+  color <- case_when(
+    sexo == "Varón" ~ "blue",
+    sexo == "Mujer" ~ "red",
+    sexo == "Ambos" ~ "black"
+  )
+  
+  # Visible por defecto solo "Varón"
+  visible <- (sexo == "Varón")
+  
+  # Agregar trazas con tamaños bien proporcionados
+  fig <- fig %>%
+    add_trace(
+      data = datos_filtrados,
+      x = ~anio_trim,
+      y = ~"Menor a Secundaria",
+      type = 'scatter',
+      mode = 'markers+text',
+      text = ~paste0(round(`prop_Menor a Secundaria`, 1), "%"),
+      textposition = "middle center",
+      marker = list(size = ~escala_puntos(`prop_Menor a Secundaria`), color = color),
+      name = paste("Menor a Secundaria (", sexo, ")"),
+      visible = visible
+    ) %>%
+    add_trace(
+      data = datos_filtrados,
+      x = ~anio_trim,
+      y = ~"Secundaria Completa",
+      type = 'scatter',
+      mode = 'markers+text',
+      text = ~paste0(round(`prop_Secundaria Completa`, 1), "%"),
+      textposition = "middle center",
+      marker = list(size = ~escala_puntos(`prop_Secundaria Completa`), color = color),
+      name = paste("Secundaria Completa (", sexo, ")"),
+      visible = visible
+    ) %>%
+    add_trace(
+      data = datos_filtrados,
+      x = ~anio_trim,
+      y = ~"Superior Incompleto",
+      type = 'scatter',
+      mode = 'markers+text',
+      text = ~paste0(round(`prop_Superior Incompleto`, 1), "%"),
+      textposition = "middle center",
+      marker = list(size = ~escala_puntos(`prop_Superior Incompleto`), color = color),
+      name = paste("Superior Incompleto (", sexo, ")"),
+      visible = visible
+    ) %>%
+    add_trace(
+      data = datos_filtrados,
+      x = ~anio_trim,
+      y = ~"Superior Completo",
+      type = 'scatter',
+      mode = 'markers+text',
+      text = ~paste0(round(`prop_Superior Completo`, 1), "%"),
+      textposition = "middle center",
+      marker = list(size = ~escala_puntos(`prop_Superior Completo`), color = color),
+      name = paste("Superior Completo (", sexo, ")"),
+      visible = visible
+    )
+}
+
+# Mostrar gráfico
+fig
