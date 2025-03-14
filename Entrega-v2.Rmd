@@ -3,25 +3,25 @@ title: "R de Resultados"
 author: "Agus Romero y Gaspo Herrero"
 date: "2025-03-09"
 output:
+  pdf_document:
+    toc: true
+  html_notebook:
+    toc: true
+    toc_float: true
   html_document:
     toc: true
     df_print: paged
-    toc_float: true
-  pdf_document:
-    toc: true
 ---
-
 
 ------------------------------------------------------------------------
 
 # Intro
-# Introducción
 
-**Objetivo:** Nos interesa explorar los principales cambios en el Mercado de Trabajo a raíz del nuevo gobierno como guía para explorar las herramientas.
+Objetivo: Nos interesa explorar los principales cambios en el Mercado de Trabajo a raíz del nuevo gobierno como guía para explorar las herramientas.
 
-Para trabajar en el entorno compartido de GitHub, configuramos una carpeta de origen de la información (*El pescado*), una carpeta con los Scripts (*El cuchillo*) y una carpeta con los resultados (*Las tripas*).
+Para trabajar en el entorno compartido de github configuarmos una carpeta de origen de la información (*El pescado*), una carpeta con los Scripts (*El cuchillo*) y una carpeta con los resultados (*Las tripas*).
 
-Como la idea era poder aplicarlo de manera repetida para los distintos trimestres y construir series, decidimos que *El pescado* contenga todas las bases de interés. Los scripts trabajan principalmente con funciones para repetir los cálculos trimestre a trimestre. En este caso, los resultados serán presentados en este Markdown (*el kanicama*).
+Como la idea era poder aplicarlo de manera repetida para los distintos trimestres y poder construir series, decidimos que el pescado contenga todas las bases de interes. Que los Scripts trabajan principalmente con funciones que permitan la repitencia trimestre a trimestre. Y en este caso, los resultados, en lugar de ser los presentados en la carpeta resultados, serán presentados en este Markdown (el kanicama).
 
 # Primeros cambios en la base
 
