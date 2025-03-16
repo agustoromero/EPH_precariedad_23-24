@@ -418,32 +418,211 @@ C._preca.total_pct <- base_asalariados %>%
 library(ggplot2)
 library(dplyr)
 library(tidyr)
-
-# Supongamos que tu dataframe final es C_preca.total_pct
-# Transformar a formato largo
-C_preca_long <- C._preca.total_pct %>%
-  pivot_longer(cols = c(Sindescuento, Trabajo_confinalizacion, 
-                         Part_time_involuntario, A_tiempo_det), 
-               names_to = "Tipo_Precariado", 
-               values_to = "Porcentaje") %>%
-  mutate(ANO4 = factor(ANO4)) #y yo que siempre pense que era un factor
-
-# Crear el gráfico
-ggplot(C_preca_long, aes(x = ANO4, y = Porcentaje, fill = Tipo_Precariado)) +
-  geom_bar(stat = "identity", position = "dodge") +
-  labs(title = "Porcentaje de Precariedad Laboral por Año",
-       x = "Año",
-       y = "Porcentaje (%)",
-       fill = "Tipo de Precariedad") +
-  theme_minimal() +
-  scale_y_continuous(labels = scales::percent_format(scale = 1))
 ```
 
-## gitme that dashboard
+## Gitme that dashboard
 
 (se sugiere reproducir este temazo <https://www.youtube.com/watch?v=BhPvay5U4i8> cantando con el título del apartado)
 
 ```{r}
-install.packages(c("shiny", "ggplot2", "dplyr", "tidyr"))
+#script 91
+
+
+
+# Función para calcular la tabla de precariedad sin descuento por sexo, nivel educativo y trimestre
+calcular_precariedad_sexo_trimestral <- function(base) {
+  
+  # Calcular tablas por sexo y nivel educativo
+  tabla_preca_SS_sexo_trimestral <- calculate_tabulates(
+    base = base,
+    x = "anio_trim",  # Trimestre
+    y = "nivel.ed1",  # Nivel educativo
+    weights = "PONDERA"
+  ) %>%
+    mutate(sexo = "Ambos")
+  
+  tabla_precaSS_educ_varon_trimestral <- base %>%
+    filter(CH04 == 1) %>%
+    calculate_tabulates(x = "anio_trim", y = "nivel.ed1", weights = "PONDERA") %>%
+    mutate(sexo = "Varón")
+  
+  tabla_precaSS_educ_mujer_trimestral <- base %>%
+    filter(CH04 == 2) %>%
+    calculate_tabulates(x = "anio_trim", y = "nivel.ed1", weights = "PONDERA") %>%
+    mutate(sexo = "Mujer")
+  
+  # Combinar tablas
+  resultado_final <- bind_rows(
+    tabla_preca_SS_sexo_trimestral,
+    tabla_precaSS_educ_varon_trimestral,
+    tabla_precaSS_educ_mujer_trimestral
+  )
+  
+  # Seleccionar solo las columnas de niveles educativos (todas menos 'anio_trim/nivel.ed1' y 'sexo')
+  columnas_niveles <- setdiff(names(resultado_final), c("anio_trim/nivel.ed1", "sexo"))
+  
+  # Sumar los valores de cada fila en las columnas de nivel educativo
+  resultado_final <- resultado_final %>%
+    rowwise() %>%
+    mutate(total_trimestre_todos_niveles = sum(c_across(all_of(columnas_niveles)), na.rm = TRUE)) %>%
+    ungroup()
+  
+  # Calcular la proporción de cada nivel educativo sobre el total
+  resultado_final <- resultado_final %>%
+    mutate(across(all_of(columnas_niveles), ~ (. / total_trimestre_todos_niveles) * 100, .names = "prop_{.col}"))
+  
+  # Verificación: sumar todas las proporciones
+  resultado_final <- resultado_final %>%
+    rowwise() %>%
+    mutate(suma_verificacion = sum(c_across(starts_with("prop_")), na.rm = TRUE)) %>%
+    ungroup()
+  
+  return(resultado_final)
+
+}
+
+# Aplicar la función a la base de datos
+c.91_precaSS_educ_sexo_final <- calcular_precariedad_sexo_trimestral(base_asalariados)
+c.91_precaSS_educ_sexo_final <- c.91_precaSS_educ_sexo_final %>%
+  rename(anio_trim = `anio_trim/nivel.ed1`)
+colnames(c.91_precaSS_educ_sexo_final)
+
+
+# Ver el resultado final
+print(c.91_precaSS_educ_sexo_final)
+
+
+
+#grafico precariedad sin descuento
+library(plotly)
+library(dplyr)
+
+# Suponemos que c.91_precaSS_educ_sexo_final ya tiene la columna anio_trim
+# (extraída previamente de `anio_trim/nivel.ed1`)
+# Aseguramos el orden deseado:
+sexos <- c("Varón", "Mujer", "Ambos")
+
+# Función para escalar tamaños (evita tamaños desproporcionados)
+escala_puntos <- function(valores) {
+  5 + sqrt(valores) * 9  # Puedes ajustar estos valores si es necesario
+}
+
+# Crear gráfico interactivo con configuración inicial
+fig <- plot_ly() %>%
+  layout(
+    title = "Proporción de Niveles Educativos - Varón",
+    xaxis = list(title = "Trimestre"),
+    yaxis = list(
+      title = "Nivel Educativo",
+      categoryorder = "array",
+      categoryarray = c("Menor a Secundaria", "Secundaria Completa", "Superior Incompleto", "Superior Completo"),
+      autorange = TRUE
+    ),
+    updatemenus = list(
+      list(
+        type = "dropdown",
+        active = 0,
+        buttons = list(
+          # Botón para Varón: primeras 4 trazas visibles
+          list(
+            method = "update", 
+            args = list(
+              list(visible = c(TRUE, TRUE, TRUE, TRUE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE)),
+              list(title = "Proporción de Niveles Educativos - Varón")
+            ),
+            label = "Varón"
+          ),
+          # Botón para Mujer: trazas 5 a 8 visibles
+          list(
+            method = "update", 
+            args = list(
+              list(visible = c(FALSE, FALSE, FALSE, FALSE, TRUE, TRUE, TRUE, TRUE, FALSE, FALSE, FALSE, FALSE)),
+              list(title = "Proporción de Niveles Educativos - Mujer")
+            ),
+            label = "Mujer"
+          ),
+          # Botón para Ambos: últimas 4 trazas visibles
+          list(
+            method = "update", 
+            args = list(
+              list(visible = c(FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, TRUE, TRUE, TRUE, TRUE)),
+              list(title = "Proporción de Niveles Educativos - Ambos")
+            ),
+            label = "Ambos"
+          )
+        )
+      )
+    )
+  )
+
+# Agregar trazas para cada grupo, en el orden deseado
+for (sexo in sexos) {
+  datos_filtrados <- c.91_precaSS_educ_sexo_final %>%
+    filter(sexo == !!sexo)
+  
+  # Asignar color según sexo
+  color <- case_when(
+    sexo == "Varón" ~ "blue",
+    sexo == "Mujer" ~ "red",
+    sexo == "Ambos" ~ "grey"
+  )
+  
+  # Solo las trazas para Varón se muestran por defecto
+  visible_flag <- ifelse(sexo == "Varón", TRUE, FALSE)
+  
+  # Se agregan 4 trazas para cada grupo (una para cada nivel educativo)
+  fig <- fig %>%
+    add_trace(
+      data = datos_filtrados,
+      x = ~ anio_trim,
+      y = ~ "Menor a Secundaria",
+      type = 'scatter',
+      mode = 'markers+text',
+      text = ~ paste0(round(`prop_Menor a Secundaria`, 1), "%"),
+      textposition = "middle center",
+      marker = list(size = ~ escala_puntos(`prop_Menor a Secundaria`), color = color),
+      name = paste("Menor a Secundaria (", sexo, ")"),
+      visible = visible_flag
+    ) %>%
+    add_trace(
+      data = datos_filtrados,
+      x = ~ anio_trim,
+      y = ~ "Secundaria Completa",
+      type = 'scatter',
+      mode = 'markers+text',
+      text = ~ paste0(round(`prop_Secundaria Completa`, 1), "%"),
+      textposition = "middle center",
+      marker = list(size = ~ escala_puntos(`prop_Secundaria Completa`), color = color),
+      name = paste("Secundaria Completa (", sexo, ")"),
+      visible = visible_flag
+    ) %>%
+    add_trace(
+      data = datos_filtrados,
+      x = ~ anio_trim,
+      y = ~ "Superior Incompleto",
+      type = 'scatter',
+      mode = 'markers+text',
+      text = ~ paste0(round(`prop_Superior Incompleto`, 1), "%"),
+      textposition = "middle center",
+      marker = list(size = ~ escala_puntos(`prop_Superior Incompleto`), color = color),
+      name = paste("Superior Incompleto (", sexo, ")"),
+      visible = visible_flag
+    ) %>%
+    add_trace(
+      data = datos_filtrados,
+      x = ~ anio_trim,
+      y = ~ "Superior Completo",
+      type = 'scatter',
+      mode = 'markers+text',
+      text = ~ paste0(round(`prop_Superior Completo`, 1), "%"),
+      textposition = "middle center",
+      marker = list(size = ~ escala_puntos(`prop_Superior Completo`), color = color),
+      name = paste("Superior Completo (", sexo, ")"),
+      visible = visible_flag
+    )
+}
+
+# Mostrar gráfico
+fig
 
 ```

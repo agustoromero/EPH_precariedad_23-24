@@ -645,10 +645,17 @@ calcular_precariedad_sexo_trimestral <- function(base) {
     ungroup()
   
   return(resultado_final)
+
 }
 
 # Aplicar la función a la base de datos
 c.91_precaSS_educ_sexo_final <- calcular_precariedad_sexo_trimestral(base_asalariados)
+c.91_precaSS_educ_sexo_final <- c.91_precaSS_educ_sexo_final %>%
+  rename(anio_trim = `anio_trim/nivel.ed1`)
+colnames(c.91_precaSS_educ_sexo_final)
+
 
 # Ver el resultado final
 print(c.91_precaSS_educ_sexo_final)
+
+
