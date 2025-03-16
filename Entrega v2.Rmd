@@ -1,5 +1,5 @@
 ---
-title: "R de Resultados"
+title: "RResultados"
 author: "Agus Romero y Gaspo Herrero"
 date: "2025-03-09"
 output:
@@ -9,27 +9,29 @@ output:
     toc_float: true
   pdf_document:
     toc: true
+  word_document:
+    toc: true
 ---
-
 
 ------------------------------------------------------------------------
 
-# Intro
 # Introducción
 
 **Objetivo:** Nos interesa explorar los principales cambios en el Mercado de Trabajo a raíz del nuevo gobierno como guía para explorar las herramientas.
 
 Para trabajar en el entorno compartido de GitHub, configuramos una carpeta de origen de la información (*El pescado*), una carpeta con los Scripts (*El cuchillo*) y una carpeta con los resultados (*Las tripas*).
 
-Como la idea era poder aplicarlo de manera repetida para los distintos trimestres y construir series, decidimos que *El pescado* contenga todas las bases de interés. Los scripts trabajan principalmente con funciones para repetir los cálculos trimestre a trimestre. En este caso, los resultados serán presentados en este Markdown (*el kanicama*).
+Como la idea era poder aplicarlo de manera repetida para los distintos trimestres y construir series, decidimos que *El pescado* contenga todas las bases de interés. Los scripts trabajan principalmente con funciones para repetir los cálculos trimestre a trimestre. Y, en este caso, los resultados serán presentados en este Markdown (*el kanicama*).
 
 # Primeros cambios en la base
 
 Construimos un entorno de trabajo y una funcion para descargar la información para luego descargar las y juntarlas, ya listas para trabajar y transformar toda junta.
 
+Vamos a trabajar con la EPH del tercer trimestre de 2023 y 2024, para ver cómo se compone el problema de la precariedad laboral de la población asalariada y ver como el primer año del gobierno de Milei afectó a esta población, para lo que compararemos el resultado de uno y otro trimestre.
+
 Como este procesamiento fue pensado para construir series y cuadros que puedan replicarse para todas las bases de interés, definidas con anterioridad, construimos la gran mayoria de cuadros y tablas a partir de funciones.
 
-```{r echo=TRUE, message=FALSE, warning=FALSE}
+```{r include=FALSE}
 #Librerías
 # Librerías necesarias
   library(tidyverse)
@@ -43,7 +45,9 @@ Como este procesamiento fue pensado para construir series y cuadros que puedan r
   library(plotly)
 
 
-  
+```
+
+```{r echo=TRUE, message=TRUE, paged.print=TRUE}
 # Configuro mi espacio de trabajo y armo las primeras direcciones y funciones
 #Ruta donde se almacenan los archivos RDS
   ruta_datos <- "01_data/"
@@ -119,23 +123,22 @@ base <- base %>%
   )
 
 # Filtrar ocupados
-base_ocupados <- base %>%
+base <- base %>%
   filter(ESTADO == 1)
 
 # Guardar base ocupados
-saveRDS(base_ocupados, "01_data/outputs_filtros/bases_ocupados.rds")
+saveRDS(base, "01_data/outputs_filtros/bases_ocupados.rds")
 
 # Cargar base de ocupados
 #base_ocupados <- readRDS("01_data/outputs_filtros/bases_ocupados.rds")
-
 
 ```
 
 Como segundos cambios, introducimos las primeras variables para cateogrizar precariedad en la población ocupada.
 
-## Tamaño del establecimiento
+## Tamaño del establecimiento: cambios
 
-Durante la construcción de estas variables, se destacan cambios en la construcción de la variable de "tamaño del establacimiento", ya que incorporamos criterios adicionales, presentes en una pregunta de rescate y en una pregunta del bloque de asalariadas particulares, que permite recateogirzar a personas que no contestaron la pregunta original del tamaño del establecimiento.
+Durante la construcción de estas variables, se destacan cambios en la construcción de la variable de "tamaño del establacimiento", ya que incorporamos criterios adicionales, presentes en una pregunta de rescate y en una pregunta del bloque de asalariadas particulares, que permite categorizar a personas que no contestaron la pregunta original del tamaño del establecimiento.\
 
 ```{r}
 #Una comparación entre las variables cosntruidas para el tamaño de establecimiento. 
@@ -172,10 +175,8 @@ print(cuadro_anexo1)
 
 Finalmente usaremos la nueva variable propuesta que permite recategorizar gran parte de las no respuestas.
 
-#ver porque hay base ocupados y base asalariados y todavia no queda claro cual se utilizará a partir de acá.
-
 ```{r}
-base_ocupados <- base %>%
+base <- base %>%
   filter(ESTADO== 1) %>%
   mutate(
     tamanio.establec = case_when(
@@ -205,13 +206,13 @@ base_ocupados <- base %>%
 
 
 #Creo la base asalariados
-base_asalariados <- base_ocupados %>% filter(CAT_OCUP==3)
+base_asalariados <- base %>% filter(CAT_OCUP==3)
 
 # Guardar base asalariados
-saveRDS(base_ocupados, "01_data/outputs_filtros/bases_ocupados.rds")
-
 saveRDS(base_asalariados, "01_data/outputs_filtros/bases_asalariados.rds")
 ```
+
+Hasta aquí trabajamos con las modificaciones a la base que son pertinentes tanto para dependientes como para aquellos que no lo son. A continuación, trabajaremos solo con los dependientes, asalariados.
 
 ## Modificaciones para asalariados
 
@@ -243,12 +244,13 @@ base_asalariados <- base_asalariados %>%
       #   TRUE ~ "0" ),
       
     # Cla1ficación de educación
-      nivel.ed = factor(case_when(
-        NIVEL_ED %in% c(7,1,2,3) ~ "Menor a Secundaria",
-        NIVEL_ED %in% c(4,5) ~ "Secundaria Completa",
-        NIVEL_ED == 6 ~ "Superior Completo",
-        TRUE ~ "Ns/Nr"),
-        levels = c("Menor a Secundaria","Secundaria Completa","Superior Completo")),
+     nivel.ed = factor(case_when(
+      NIVEL_ED %in% c(7,1,2,3) ~ "Menor a Secundaria", 
+      NIVEL_ED %in% 4 ~ "Secundaria Completa",
+      NIVEL_ED == 5 ~ "Superior Incompleto",
+      NIVEL_ED == 6 ~ "Superior Completo",
+      TRUE ~ "Ns/Nr"
+    ), levels = c("Menor a Secundaria","Secundaria Completa","Superior Incompleto","Superior Completo")),
     
     # Cla1ficación de tamaño del establecimiento
    tamanio.establec= case_when(
@@ -271,26 +273,35 @@ base_asalariados <- base_asalariados %>%
     total_precario = Signo_educ_tamaño + Signo_sindescuento + Signo_tiempo 
     # + 1gno_tecno_calif)
 )
+
 # Guardar base con precariedad
-saveRDS (base_asalariados, "01_data/outputs_filtros/bases_precariedad.rds")
+saveRDS (base_asalariados, "01_data/outputs_filtros/bases_asalariados_precariedad.rds")
 
 
 ```
 
 Por problemas con la variable que vincula calificación y tecnología del puesto de trabajo con la precariedad("Tecnología y calificación" o "preca_tecno_calif"), utilizaremos nivel educativo y tamaño. Intentaremos resolver en próximas experiencias.
 
-# Precariedad según nivel educativo
+# Precariedad - Asalariados sin descuentos jubilatorios
+
+En este apartado trabajremos a los precarios identificandolos en base a la tenencia o no de descuentos jubilatorios. A fin de identificar qué población es la afectada principalmente por la precariedad haremos unos cruces por edad y sexo de la población considerada precaria.
+
+## Según nivel educativo
+
+Construimos un cuadro para identificar cómo está compuesta la precariedad segun nivel educativo.
 
 ```{r}
 #Entrada
+C.niveled <- base_asalariados  %>% group_by(nivel.ed1) %>% summarise(total=sum(PONDERA))
+  
+  
 C._preca.nivel.ed <- base_asalariados %>%
   group_by(ANO4, nivel.ed1) %>%  
   summarise(
     Poblacion_Ambos = sum(PONDERA),
-    Poblacion_precaria = sum(PONDERA[descuento_jubil == "No"]),   .groups = "drop"
-  ) %>%
+    Poblacion_precaria = sum(PONDERA[descuento_jubil == "No"]),   .groups = "drop" ) %>%
   mutate(
-    'Prop. precarios' = Poblacion_precaria / Poblacion_Ambos
+    'Prop. precarios' = (Poblacion_precaria / Poblacion_Ambos)
   )
 #orden
 data_ano1 <- C._preca.nivel.ed %>%
@@ -302,27 +313,27 @@ data_ano2 <- C._preca.nivel.ed %>%
   filter(ANO4 == 2024) %>%
   select(-ANO4) %>%
   rename(Prop_precarios_2024 = `Prop. precarios`)
+
 #Salida
-C._preca.nivel.ed <- left_join(data_ano1, data_ano2, by = "nivel.ed1") %>%  mutate(
+C._preca.nivel.ed2 <- left_join(data_ano1, data_ano2, by = "nivel.ed1") %>%  mutate(
     Prop_precarios_2023 = round(Prop_precarios_2023 * 100, 1),
     Prop_precarios_2024 = round(Prop_precarios_2024 * 100, 1),
-    Diferencia = round((Prop_precarios_2024 - Prop_precarios_2023), 1)
+    Diferencia = round((Prop_precarios_2024 - Prop_precarios_2023), 2)
   ) %>%
   select(nivel.ed1, Prop_precarios_2023, Prop_precarios_2024, Diferencia)  # Solo las columnas necesarias
 
   
-print(C._preca.nivel.ed)
+print(C._preca.nivel.ed2)
 ```
 
-# Precariedad según sexo
+La población con menor nivel educativo tiene una mayor partipación en el empleo precario. No solo son mas, sino que además, son mas precarios.\
+Si bien acá trabajamos con categorías discretas, una primera impresión permite pensar en que "completar" un nivel educativo permite "pegar un salto": las personas con nivel educativo completo tienen una menor participación en la precariedad laboral; los trabajadores con nivel universiatario incompleto también se encuentran en una mejor situación, pero no marcadamente mejor que aquellos que tienen un nivel secundario completo; mientras que los de nivel educativo superior completo, tienen, nuevamente una marcada mejor situación que aquellos de nivel incompleto.
 
-Intentando explicar las diferencias en el nivel de precariedad entre varones y mujeres con un cuadro por trimestre y las diferencias.#Proporción de precarios según sexo.
+Observamos también que el impacto del primer año del gobierno de Milei, agrava la situación de precariedad para todos los niveles educativos, los menos golpeados son los de nivel educativo superior completo. Mientras que en segundo lugar se encuentran los de nivel secundario incompleto, que también presentan un menor impacto, esto puede deberse a que los niveles de precariedad en esta población ya son muy altos.
 
-Trabajo la información en trimestres
+## Precariedad según sexo
 
-#este de aca se me fue a la mierda. pero la idea esta. Creo que se podría hacer un dashboard con algo de esto. ¿no? (llamada)
-
-\|
+Intentando explicar las diferencias en el nivel de precariedad entre varones y mujeres con un cuadro por trimestre y las diferencias.
 
 ```{r message=TRUE, paged.print=TRUE}
 #Entrada
@@ -360,26 +371,13 @@ cambio_precariedad_sexo <- left_join(data_ano1, data_ano2, by = "CH04") %>%
 print(cambio_precariedad_sexo)
 ```
 
-(introducir analisis: las mujeres son mas rpecarias y en el año de milei estan peor).
+El analisis por sexo nos permite visibilizar la situación de las mujeres que presentan un manyor nivel de precariedad, y que además, se vieron mas perjudicadas por el primer año del gobierno de Milei y que agravan su situación de precariedad.
 
 ## Precariedad Multidimensional
 
 Ahora bien para evaluar cual es el mejor indicador de estos a la hora de identificar la situación de precariedad construimos un cuadro que cruce las distintas dimensiones con una variable que funciona como "intensidad de la precariedad" dónde cada personas es mas precaria según cuantas dimensiones de precariedad se le haya encontrado.
 
 ```{r}
-
-C._preca.nivel.ed <- base_asalariados %>%
-  group_by(ANO4, nivel.ed1) %>%  
-  summarise(
-    Poblacion_Ambos = sum(PONDERA, na.rm = TRUE),  # Punto 2: Agregar na.rm = TRUE
-    Poblacion_precaria = sum(PONDERA[descuento_jubil == "No"], na.rm = TRUE),  # Punto 2: Agregar na.rm = TRUE
-    .groups = "drop"
-  ) %>%
-  mutate(
-    `Prop. precarios` = Poblacion_precaria / Poblacion_Ambos
-  )
-
-
 C._preca.total <- base_asalariados %>%
   group_by(ANO4, total_precario) %>%
   summarise(
@@ -391,7 +389,7 @@ C._preca.total <- base_asalariados %>%
     .groups = "drop"
   ) %>%
   mutate(
-    `Prop. precarios` = sindescuento / Total  # Cambio de nombres
+    `Prop. precarios.sin.descuentos` = sindescuento / Total  # Cambio de nombres
   )
 
 ```
@@ -417,131 +415,35 @@ C._preca.total_pct <- base_asalariados %>%
 ```
 
 ```{r}
+library(ggplot2)
+library(dplyr)
+library(tidyr)
 
-sexos <- c("Varón", "Mujer", "Ambos")
+# Supongamos que tu dataframe final es C_preca.total_pct
+# Transformar a formato largo
+C_preca_long <- C._preca.total_pct %>%
+  pivot_longer(cols = c(Sindescuento, Trabajo_confinalizacion, 
+                         Part_time_involuntario, A_tiempo_det), 
+               names_to = "Tipo_Precariado", 
+               values_to = "Porcentaje") %>%
+  mutate(ANO4 = factor(ANO4)) #y yo que siempre pense que era un factor
 
-# Función para escalar tamaños (evita tamaños desproporcionados)
-escala_puntos <- function(valores) {
-  5 + sqrt(valores) * 9  # Puedes ajustar estos valores si es necesario
-}
-
-# Crear gráfico interactivo con configuración inicial
-fig <- plot_ly() %>%
-  layout(
-    title = "Proporción de Niveles Educativos - Varón",
-    xaxis = list(title = "Trimestre"),
-    yaxis = list(
-      title = "Nivel Educativo",
-      categoryorder = "array",
-      categoryarray = c("Menor a Secundaria", "Secundaria Completa", "Superior Incompleto", "Superior Completo"),
-      autorange = TRUE
-    ),
-    updatemenus = list(
-      list(
-        type = "dropdown",
-        active = 0,
-        buttons = list(
-          # Botón para Varón: primeras 4 trazas visibles
-          list(
-            method = "update", 
-            args = list(
-              list(visible = c(TRUE, TRUE, TRUE, TRUE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE)),
-              list(title = "Proporción de Niveles Educativos - Varón")
-            ),
-            label = "Varón"
-          ),
-          # Botón para Mujer: trazas 5 a 8 visibles
-          list(
-            method = "update", 
-            args = list(
-              list(visible = c(FALSE, FALSE, FALSE, FALSE, TRUE, TRUE, TRUE, TRUE, FALSE, FALSE, FALSE, FALSE)),
-              list(title = "Proporción de Niveles Educativos - Mujer")
-            ),
-            label = "Mujer"
-          ),
-          # Botón para Ambos: últimas 4 trazas visibles
-          list(
-            method = "update", 
-            args = list(
-              list(visible = c(FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, TRUE, TRUE, TRUE, TRUE)),
-              list(title = "Proporción de Niveles Educativos - Ambos")
-            ),
-            label = "Ambos"
-          )
-        )
-      )
-    )
-  )
-
-# Agregar trazas para cada grupo, en el orden deseado
-for (sexo in sexos) {
-  datos_filtrados <- c.91_precaSS_educ_sexo_final %>%
-    filter(sexo == !!sexo)
-  
-  # Asignar color según sexo
-  color <- case_when(
-    sexo == "Varón" ~ "blue",
-    sexo == "Mujer" ~ "red",
-    sexo == "Ambos" ~ "grey"
-  )
-  
-  # Solo las trazas para Varón se muestran por defecto
-  visible_flag <- ifelse(sexo == "Varón", TRUE, FALSE)
-  
-  # Se agregan 4 trazas para cada grupo (una para cada nivel educativo)
-  fig <- fig %>%
-    add_trace(
-      data = datos_filtrados,
-      x = ~ anio_trim,
-      y = ~ "Menor a Secundaria",
-      type = 'scatter',
-      mode = 'markers+text',
-      text = ~ paste0(round(`prop_Menor a Secundaria`, 1), "%"),
-      textposition = "middle center",
-      marker = list(size = ~ escala_puntos(`prop_Menor a Secundaria`), color = color),
-      name = paste("Menor a Secundaria (", sexo, ")"),
-      visible = visible_flag
-    ) %>%
-    add_trace(
-      data = datos_filtrados,
-      x = ~ anio_trim,
-      y = ~ "Secundaria Completa",
-      type = 'scatter',
-      mode = 'markers+text',
-      text = ~ paste0(round(`prop_Secundaria Completa`, 1), "%"),
-      textposition = "middle center",
-      marker = list(size = ~ escala_puntos(`prop_Secundaria Completa`), color = color),
-      name = paste("Secundaria Completa (", sexo, ")"),
-      visible = visible_flag
-    ) %>%
-    add_trace(
-      data = datos_filtrados,
-      x = ~ anio_trim,
-      y = ~ "Superior Incompleto",
-      type = 'scatter',
-      mode = 'markers+text',
-      text = ~ paste0(round(`prop_Superior Incompleto`, 1), "%"),
-      textposition = "middle center",
-      marker = list(size = ~ escala_puntos(`prop_Superior Incompleto`), color = color),
-      name = paste("Superior Incompleto (", sexo, ")"),
-      visible = visible_flag
-    ) %>%
-    add_trace(
-      data = datos_filtrados,
-      x = ~ anio_trim,
-      y = ~ "Superior Completo",
-      type = 'scatter',
-      mode = 'markers+text',
-      text = ~ paste0(round(`prop_Superior Completo`, 1), "%"),
-      textposition = "middle center",
-      marker = list(size = ~ escala_puntos(`prop_Superior Completo`), color = color),
-      name = paste("Superior Completo (", sexo, ")"),
-      visible = visible_flag
-    )
-}
-
-# Mostrar gráfico
-fig
-
+# Crear el gráfico
+ggplot(C_preca_long, aes(x = ANO4, y = Porcentaje, fill = Tipo_Precariado)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(title = "Porcentaje de Precariedad Laboral por Año",
+       x = "Año",
+       y = "Porcentaje (%)",
+       fill = "Tipo de Precariedad") +
+  theme_minimal() +
+  scale_y_continuous(labels = scales::percent_format(scale = 1))
 ```
 
+## gitme that dashboard
+
+(se sugiere reproducir este temazo <https://www.youtube.com/watch?v=BhPvay5U4i8> cantando con el título del apartado)
+
+```{r}
+install.packages(c("shiny", "ggplot2", "dplyr", "tidyr"))
+
+```
